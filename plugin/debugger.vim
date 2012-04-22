@@ -2,7 +2,7 @@
 "
 " Script Info and Documentation  {{{
 "=============================================================================
-"    Copyright: Copyright (C) 2007 Sam Ghods
+"    Copyright: Copyright (C) 2012 Brook Hong
 "      License:	The MIT License
 "				
 "				Permission is hereby granted, free of charge, to any person obtaining
@@ -25,17 +25,9 @@
 "				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 " Name Of File: debugger.vim, debugger.py
 "  Description: remote debugger interface to DBGp protocol
-"   Maintainer: Sam Ghods <sam <at> box.net>; hzgmaxwell <at> hotmail <dot> com
-"  Last Change: Apr 18, 2012
-"          URL: http://www.vim.org/scripts/script.php?script_id=1929
-"      Version: 1.1.2
-"               Originally written by Seung Woo Shin <segv <at> sayclub.com>
-"               The original script is located at:
-"				http://www.vim.org/scripts/script.php?script_id=1152
-"        Usage: N.B.: For a complete tutorial on how to setup this script,
-"               please visit:
-"               http://tech.blog.box.net/2007/06/20/how-to-debug-php-with-vim-and-xdebug-on-linux/
-"               -----
+"               The DBGPavim originates from http://www.vim.org/scripts/script.php?script_id=1152 and http://www.vim.org/scripts/script.php?script_id=1929, with a new enhanced debugger engine.
+ 
+"   Maintainer: hzgmaxwell <at> hotmail <dot> com
 "
 "               This file should reside in the plugins directory along
 "               with debugger.py and be automatically sourced.
@@ -71,42 +63,12 @@
 "
 "                 let g:debuggerMaxDepth = 10
 "
-"               Finally, if you use the Mini Buffer Explorer vim plugin,
-"               minibufexpl.vim, running the debugger may mess up your window
-"               setup. As a result the script has support to close and open
-"               the explorer when you enter and quit debugging sessions. To
-"               enable this support, add the following line to your vimrc:
+"               g:debuggerBreakAtEntry (default 1): Whether to break at entry,
+"               if set it 0, the debugger engine will break only at
+"               breakpoints.
+"               For example:
 "
-"                 let g:debuggerMiniBufExpl = 1
-"
-"      History: 1.1.1 o Added a check so the script doesn't load if python is
-"                     not compiled in. (Contributed by Lars Becker.)
-"               1.1   o Added vim variable to change port.
-"                     o You can now put debugger.py in either runtime directory
-"                     or the home directory.
-"                     o Added to ability to change max children, data and depth
-"                     settings.
-"                     o Made it so stack_get wouldn't be called if the debugger
-"                     has already stopped.
-"                     o Added support for minibufexpl.vim.
-"                     o License added.
-"               1.0   o Initial release on December 7, 2004
-"      
-" Known Issues: The code is designed for the DBGp protocol, but it has only been
-" 				tested with XDebug 2.0RC4. If anyone would like to contribute patches
-" 				to get it working with other DBGp software, I would be happy
-" 				to implement them.
-"
-" 				Sometimes things go a little crazy... breakpoints don't show
-" 				up, too many windows are created / not enough are closed, and
-" 				so on... if you can actually find a set of solidly
-" 				reproducible steps that lead to a bug, please do e-mail <sam
-" 				<at> box.net> and I will take a look.
-" 
-"         Todo: Compatibility for other DBGp engines.
-"
-"         		Add a status line/window which constantly shows what the current
-"         		status of the debugger is. (starting, break, stopped, etc.)
+"                 let g:debuggerBreakAtEntry = 0
 "
 "=============================================================================
 " }}}
@@ -116,9 +78,7 @@ if !has("python")
     finish
 endif
 
-" Load debugger.py either from the runtime directory (usually
-" /usr/local/share/vim/vim71/plugin/ if you're running Vim 7.1) or from the
-" home vim directory (usually ~/.vim/plugin/).
+" Load debugger.py either from the same path where debugger.vim is
 let s:debugger_py = expand("<sfile>:p:h")."/debugger.py"
 if filereadable(s:debugger_py)
   exec 'pyfile '.s:debugger_py
@@ -126,38 +86,42 @@ else
   call confirm('debugger.vim: Unable to find '.s:debugger_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
 endif
 
-map <F1> :python debugger_resize()<cr>
-map <F2> :python debugger_command('step_into')<cr>
-map <F3> :python debugger_command('step_over')<cr>
-map <F4> :python debugger_command('step_out')<cr>
+map <F1> :python debugger.resize()<cr>
+map <F2> :python debugger.command('step_into')<cr>
+map <F3> :python debugger.command('step_over')<cr>
+map <F4> :python debugger.command('step_out')<cr>
 
-map <Leader>dr :python debugger_resize()<cr>
-map <Leader>di :python debugger_command('step_into')<cr>
-map <Leader>do :python debugger_command('step_over')<cr>
-map <Leader>dt :python debugger_command('step_out')<cr>
+map <Leader>dr :python debugger.resize()<cr>
+map <Leader>di :python debugger.command('step_into')<cr>
+map <Leader>do :python debugger.command('step_over')<cr>
+map <Leader>dt :python debugger.command('step_out')<cr>
 
-nnoremap ,pe :python debugger_watch_input("eval")<cr>A
+nnoremap ,pe :python debugger.watch_input("eval")<cr>A
 
-map <F5> :python debugger_run()<cr>
+map <F5> :python debugger.run()<cr>
 map <F6> :python debugger.quit()<cr>
 
-map <F7> :python debugger_command('step_into')<cr>
-map <F8> :python debugger_command('step_over')<cr>
-map <F9> :python debugger_command('step_out')<cr>
+map <F7> :python debugger.command('step_into')<cr>
+map <F8> :python debugger.command('step_over')<cr>
+map <F9> :python debugger.command('step_out')<cr>
 
-map <F11> :python debugger_context()<cr>
-map <F12> :python debugger_property()<cr>
-map <F11> :python debugger_watch_input("context_get")<cr>A<cr>
-map <F12> :python debugger_watch_input("property_get", '<cword>')<cr>A<cr>
+map <F11> :python debugger.context('context_get')<cr>
+map <F12> :python debugger.property()<cr>
+map <F11> :python debugger.watch_input("context_get")<cr>A<cr>
+map <F12> :python debugger.watch_input("property_get", '<cword>')<cr>A<cr>
 
 hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
 hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
-
-command! -nargs=? Bp python debugger_mark('<args>')
+function! Bae(val)
+  let g:debuggerBreakAtEntry = a:val
+  execute 'python debugger.break_at_entry = '.a:val
+endfunction
+command! -nargs=1 Bae :call Bae('<args>')
+command! -nargs=? Bp python debugger.mark('<args>')
 command! -nargs=0 Bl python debugger.list()
-command! -nargs=? Pg python debugger_property("<args>")
-command! -nargs=0 Up python debugger_up()
-command! -nargs=0 Dn python debugger_down()
+command! -nargs=? Pg python debugger.property("<args>")
+command! -nargs=0 Up python debugger.up()
+command! -nargs=0 Dn python debugger.down()
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
 if !exists('g:debuggerPort')
@@ -172,8 +136,8 @@ endif
 if !exists('g:debuggerMaxDepth')
   let g:debuggerMaxDepth = 1
 endif
-if !exists('g:debuggerMiniBufExpl')
-  let g:debuggerMiniBufExpl = 0
+if !exists('g:debuggerBreakAtEntry')
+  let g:debuggerBreakAtEntry = 1
 endif
 python debugger_init(1)
 set laststatus=2

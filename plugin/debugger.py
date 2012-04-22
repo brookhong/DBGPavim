@@ -2,7 +2,7 @@
 # -*- c--oding: ko_KR.UTF-8 -*-
 # remote PHP debugger : remote debugger interface to DBGp protocol
 #
-# Copyright (c) 2003-2006 ActiveState Software Inc.
+# Copyright (c) 2012 Brook Hong
 #
 # The MIT License
 #
@@ -27,9 +27,11 @@
 #
 #
 # Authors:
+#    Brook Hong <hzgmaxwell <at> hotmail.com>
+#    The plugin was originally writen by --
 #    Seung Woo Shin <segv <at> sayclub.com>
 #    Sam Ghods <sam <at> box.net>
-#    Brook Hong <hzgmaxwell <at> hotmail.com>
+#    I rewrote it with a new debugger engine, please diff this file to find code change.
 
 """
     debugger.py -- DBGp client: a remote debugger interface to DBGp protocol
@@ -57,78 +59,6 @@ import traceback
 import xml.dom.minidom
 
 from threading import Thread,Lock
-#######################################################################################################################
-#                                                                                                                     #
-# this diagram is little outdated.                                                                                    #
-#                                                                                                                     #
-#                                                                                                                     #
-#                          +---[ class Debugger ]-----------+                                                         #
-#                          |     [m] run()                  |                                                         #
-#                          |     [m] mark()                 |                                                         #
-#                          |     [m] command()              |                                                         #
-#                          |     [m] stop()                 |                                                         #
-#                     +--------- [m] handle_msg() ------------------+                                                 #
-#                     |    |                                |       |  handle all other tags                          #
-#     if error        +--------> [m] handle_error()         |       |    comming from server                          #
-#                     |    |     [m] handle_*()   <-----------------+                                                 #
-#                     |    |                                |                                                         #
-#     if <response >  +--------> [m] handle_response() -------------+                                                 #
-#                          |                                |       |  if <response command='*'>                      #
-#                          |     [m] handle_response_*() <----------+                                                 #
-#                          |                                |                                                         #
-#                          |  +--[ class DbgProtocol ]--+   |                                                         #
-# +-------+  1. connect    |  |                         |   |                                                         #
-# |debug  | ---------------------> [m] accept()         |   |                                                         #
-# |       | <-- 2. send ---------- [m] send_msg()       |   |                                                         #
-# | server| --- 3. recv ---------> [m] recv_msg()       |   |                                                         #
-# +-------+                |  |                         |   |                                                         #
-#                          |  +-------------------------+   |                                                         #
-#                          |                                |                                                         #
-#                          |  +--[ class BreakPoint ]---+   |                                                         #
-#                          |  |    manage breakpoints   |   |                                                         #
-#                          |  |    [m] add()            |   |                                                         #
-#                          |  |    [m] remove()         |   |                                                         #
-#                          |  |    [m] list()           |   |                                                         #
-#                          |  +-------------------------+   |                             VIM                         #
-#                          |                                |                +--------------+-----+                   #                 
-#  [m] method              |  +--[ class DebugUI ]------+   |                |              |     |  <----+           #
-#  [f] class               |  |    [m] debug_mode()     | ------------------ |              +-----+       |           #
-#                          |  |    [m] normal_mode()    |   |   controls     |  srv         |     |  <----+           #
-#                          |  |    [m] goto()           |   |    all vim     |    view      +-----+       |           #
-#                          |  |    [m] stackwrite()     |   |     windows    |              |     |  <----+           #
-#                          |  |    [m] stackwrite()     |   |                |              +-----+       |           #
-#                          |  +-------------------------+   |                |              |     |  <----+           #
-#                          |                                |                |              +-----+       |           #
-#                          |  +--[ class VimWindow ]----+   |                |              |     |  <----+           #
-#                          |  |    [m] create()         |   |                +--------------+-----+       |           #
-#                          |  |    [m] write()          |   |                                             |           #
-#                          |  |    [m] create()         | ------------------------------------------------+           #              
-#                          |  |    [m] create()         |   |    controls each debug window                           #
-#                          |  +-------------------------+   |     (except src view)                                   #
-#                          |                                |                                                         #
-#                          +--------------------------------+                                                         #
-#                                                                                                                     #
-#  global debugger  <----+                                                                                            #
-#                        | creates                                                                                    #
-#  [f] debugger_init() --+                                                                                            #
-#  [f] debugger_run()      <-+                                                                                        #
-#  [f] debugger_context()    |                                                                                        #
-#  [f] debugger_command()    +------ map <F5> :python debugger_run()                                                  #
-#  [f] debugger_stop()       |         ... etc ...                                                                    #
-#  [f] debugger_mark()     <-+                                                                                        #
-#                                                                                                                     #
-#                                                                                                                     #
-#######################################################################################################################
-
-#class XMLPrintFold(XMLPrint):
-#  def fixup_childs(self, line, node, level):
-#    line = ('{{{' + str(level+1)).ljust(level*4+6) + line +  '\n'
-#    line += self.xml_stringfy_childs(node, level+1)
-#    line += '}}}' + str(level+1) + '\n'
-#    return line
-#  def fixup_single(self, line, node, level):
-#    return ''.ljust(level*4+6) + line + '\n'
-#
 
 class VimWindow:
   """ wrapper class of window of vim """
@@ -389,7 +319,7 @@ class WatchWindow(VimWindow):
       return str(node.data)
   def on_create(self):
     self.write('<?')
-    self.command('inoremap <buffer> <cr> <esc>:python debugger.watch_execute()<cr>')
+    self.command('inoremap <buffer> <cr> <esc>:python debugger.debugSession.watch_execute()<cr>')
     self.command('set noai nocin')
     self.command('set nowrap fdm=marker fmr={{{,}}} ft=php fdl=1')
   def input(self, mode, arg = ''):
@@ -434,7 +364,7 @@ class HelpWindow(VimWindow):
 
 class DebugUI:
   """ DEBUGUI class """
-  def __init__(self, minibufexpl = 0):
+  def __init__(self):
     """ initialize object """
     self.watchwin = WatchWindow()
     self.stackwin = StackWindow()
@@ -449,15 +379,12 @@ class DebugUI:
       self.sessfile = "./debugger_vim_saved_session." + str(os.getpid())
     else:
       self.sessfile = "/tmp/debugger_vim_saved_session." + str(os.getpid())
-    self.minibufexpl = minibufexpl
 
   def debug_mode(self):
     """ change mode to debug """
     if self.mode == 1: # is debug mode ?
       return
     self.mode = 1
-    if self.minibufexpl == 1:
-      vim.command('CMiniBufExplorer')         # close minibufexplorer if it is open
     # save session
     vim.command('mksession! ' + self.sessfile)
     for i in range(1, len(vim.windows)+1):
@@ -499,10 +426,6 @@ class DebugUI:
     self.line    = None
     self.mode    = 0
     self.cursign = None
-
-    if self.minibufexpl == 1:
-      vim.command('MiniBufExplorer')         # close minibufexplorer if it is open
-
   def create(self):
     """ create windows """
     self.watchwin.create('vertical belowright new')
@@ -550,72 +473,30 @@ class DebugUI:
     self.line    = line
     self.cursign = nextsign
 
-class DbgProtocol(Thread):
-  (INIT,LISTEN,CLOSED) = (0,1,2)
-  """ DBGp Procotol class """
-  def __init__(self, port = 9000):
-    self.port     = port
-    self.sock     = None
-    self.sock_queue = []
-    self._status  = self.INIT
-    self.lock = Lock()
-    Thread.__init__(self)
-  def nextConnection(self):
-    self.lock.acquire()
-    if len(self.sock_queue) > 0:
-      self.sock = self.sock_queue.pop(0)
-    self.lock.release()
-    return self.sock
-  def closeCurrentConnection(self):
-    if self.sock != None:
-      self.sock.close()
-      self.sock = None
-    s = "--LISN"
-    if len(self.sock_queue) > 0:
-      c = str(len(self.sock_queue))
-      s = "--PEND"+c
-      print c+" pending connection(s) to be debug, press <F5> to continue."
-    debugger.updateStatusLine(s)
-  def stop(self):
-    self.closeCurrentConnection()
-    self.lock.acquire()
-    if self._status == self.LISTEN:
-      client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
-      client.connect ( ( '127.0.0.1', self.port ) )
-      client.close()
-    for sock in self.sock_queue:
-      sock.close()
-    self._status = self.CLOSED
-    self.lock.release()
-  def status(self):
-    self.lock.acquire()
-    s = self._status
-    self.lock.release()
-    return s
-  def run(self):
-    global debugger
-    serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    serv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    serv.bind(('', self.port))
-    serv.listen(5)
-    self._status = self.LISTEN
-    while 1:
-      (sock, address) = serv.accept()
-      s = self.status()
-      if s == self.LISTEN:
-        self.sock_queue.append(sock)
-        c = str(len(self.sock_queue))
-        debugger.updateStatusLine("--PEND"+c)
-        print c+" pending connection(s) to be debugged, press <F5> to continue."
-      else:
-        break
-    serv.close()
+class DbgSession:
+  def __init__(self, sock):
+    self.latestRes = None
+    self.msgid = 0
+    self.sock = sock
+    self.bptsetlst  = {} 
+    self.bptsetids  = {} 
+  def handle_response_breakpoint_set(self, res):
+    """handle <response command=breakpoint_set> tag
+    <responsponse command="breakpoint_set" id="110180001" transaction_id="1"/>"""
+    if res.firstChild.hasAttribute('id'):
+      tid = int(res.firstChild.getAttribute('transaction_id'))
+      bno = self.bptsetlst[tid]
+      del self.bptsetlst[tid]
+      self.bptsetids[bno] = res.firstChild.getAttribute('id')
+  def getbid(self, bno):
+    """ get Debug Server's breakpoint numbered with bno """
+    if bno in self.bptsetids:
+      return self.bptsetids[bno]
+    return None
   def recv_data(self,len):
-    global debugger
     c = self.sock.recv(len)
     if c == '':
       # LINUX come here
-      self.closeCurrentConnection()
       raise EOFError, 'Socket Closed'
     return c
   def recv_length(self):
@@ -641,7 +522,6 @@ class DbgProtocol(Thread):
       body = body + buf
     return body
   def recv_msg(self):
-    global debugger
     try:
       length = self.recv_length()
       body   = self.recv_body(length)
@@ -650,152 +530,106 @@ class DbgProtocol(Thread):
     except socket.error, e:
       # WINDOWS come here
       if e[0] == 10053:
-        self.closeCurrentConnection()
         raise EOFError, 'Socket Closed'
       else:
         raise EOFError, 'Socket Error '+str(e[0])
   def send_msg(self, cmd):
     self.sock.send(cmd + '\0')
-
-class BreakPoint:
-  """ Breakpoint class """
-  def __init__(self):
-    """ initalize """
-    self.breakpt  = {}
-    self.revmap   = {}
-    self.startbno = 10000
-    self.maxbno   = self.startbno
-  def clear(self):
-    """ clear of breakpoint number """
-    self.breakpt.clear()
-    self.revmap.clear()
-    self.maxbno = self.startbno
-  def add(self, file, line, exp = ''):
-    """ add break point at file:line """
-    self.maxbno = self.maxbno + 1
-    self.breakpt[self.maxbno] = { 'file':file, 'line':line, 'exp':exp, 'id':None }
-    return self.maxbno
-  def remove(self, bno):
-    """ remove break point numbered with bno """
-    del self.breakpt[bno]
-  def find(self, file, line):
-    """ find break point and return bno(breakpoint number) """
-    for bno in self.breakpt.keys():
-      if self.breakpt[bno]['file'] == file and self.breakpt[bno]['line'] == line:
-        return bno
-    return None
-  def getfile(self, bno):
-    """ get file name of breakpoint numbered with bno """
-    return self.breakpt[bno]['file']
-  def getline(self, bno):
-    """ get line number of breakpoint numbered with bno """
-    return self.breakpt[bno]['line']
-  def getexp(self, bno):
-    """ get expression of breakpoint numbered with bno """
-    return self.breakpt[bno]['exp']
-  def getid(self, bno):
-    """ get Debug Server's breakpoint numbered with bno """
-    return self.breakpt[bno]['id']
-  def setid(self, bno, id):
-    """ get Debug Server's breakpoint numbered with bno """
-    self.breakpt[bno]['id'] = id
-  def list(self):
-    """ return list of breakpoint number """
-    return self.breakpt.keys()
-
-class Debugger:
-  """ Main Debugger class """
-
-
-  #################################################################################################################
-  # Internal functions
-  #
-  def __init__(self, port = 9000, max_children = '32', max_data = '1024', max_depth = '1', minibufexpl = '0', debug = 0):
-    """ initialize Debugger """
-    self.port       = port
-    self.debug      = debug
-
-    self.current    = None
-    self.file       = None
-    self.lasterror  = None
-    self.msgid      = 0
-    self.running    = 0
-    self.stacks     = []
-    self.curstack   = 0
-    self.laststack  = 0
-    self.bptsetlst  = {} 
-
-    self.status        = None
-    self.max_children  = max_children
-    self.max_data      = max_data
-    self.max_depth     = max_depth
-
-    self.protocol   = DbgProtocol(self.port)
-
-    self.ui         = DebugUI(minibufexpl)
-    self.statusline = vim.eval('&statusline')
-    self.breakpt    = BreakPoint()
-
-    vim.command('sign unplace *')
-
-  def updateStatusLine(self,msg):
-    sl = self.statusline+"%{'"+msg+"'}"
-    vim.command("let &statusline=\""+sl+"\"")
-
-  def clear(self):
-    self.protocol.stop()
-    self.current   = None
-    self.lasterror = None
-    self.msgid     = 0
-    self.running   = 0
-    self.stacks    = []
-    self.curstack  = 0
-    self.laststack = 0
-    self.bptsetlst = {} 
-
-  def send(self, msg):
-    """ send message """
-    self.protocol.send_msg(msg)
-    # log message
-    if self.debug:
-      self.ui.tracewin.write(str(self.msgid) + ' : send =====> ' + msg)
-  def recv(self, count=10000):
-    """ receive message until response is last transaction id or received count's message """
-    while count>0:
-      count = count - 1
-      # recv message and convert to XML object
-      txt = self.protocol.recv_msg()
-      res = xml.dom.minidom.parseString(txt)
-      # log messages {{{
-      if self.debug:
-        self.ui.tracewin.write( str(self.msgid) + ' : recv <===== {{{   ' + txt)
-        self.ui.tracewin.write('}}}')
-      # handle message
-      self.handle_msg(res)
-      # exit, if response's transaction id == last transaction id
-      try:
-        if int(res.firstChild.getAttribute('transaction_id')) == int(self.msgid):
-          return
-      except:
-        pass
+  def handle_recvd_msg(self, res):
+    resDom = xml.dom.minidom.parseString(res)
+    #debugger.ui.tracewin.write(res)
+    if resDom.firstChild.tagName == "response" and resDom.firstChild.getAttribute('command') == "breakpoint_set":
+      self.handle_response_breakpoint_set(resDom)
+    return resDom
   def send_command(self, cmd, arg1 = '', arg2 = ''):
-    """ send command (do not receive response) """
     self.msgid = self.msgid + 1
     line = cmd + ' -i ' + str(self.msgid)
     if arg1 != '':
       line = line + ' ' + arg1
     if arg2 != '':
       line = line + ' -- ' + base64.encodestring(arg2)[0:-1]
-    self.send(line)
+    self.send_msg(line)
     return self.msgid
-  #
-  #
-  #################################################################################################################
+  def ack_command(self, count=10000):
+    while count>0:
+      count = count - 1
+      self.latestRes = self.recv_msg()
+      resDom = self.handle_recvd_msg(self.latestRes)
+      try:
+        if int(resDom.firstChild.getAttribute('transaction_id')) == int(self.msgid):
+          return resDom
+      except:
+        pass
+  def command(self, cmd, arg1 = '', arg2 = ''):
+    self.send_command(cmd, arg1, arg2)
+    return self.ack_command()
+  def close(self):
+    if self.sock:
+      self.sock.close()
+      self.sock = None
+  def init(self):
+    self.ack_command(1)
+    flag = 0
+    for bno in debugger.breakpt.list():
+      msgid = self.send_command('breakpoint_set', \
+                                '-t line -f ' + debugger.breakpt.getfile(bno) + ' -n ' + str(debugger.breakpt.getline(bno)) + ' -s enabled', \
+                                debugger.breakpt.getexp(bno))
+      self.bptsetlst[msgid] = bno
+      flag = 1
+    if flag:
+      self.ack_command()
 
-  #################################################################################################################
-  # Internal message handlers
-  #
-  def handle_msg(self, res):
+class DbgSessionWithUI(DbgSession):
+  def __init__(self, sock, max_children = '32', max_data = '1024', max_depth = '1', debug = 0):
+    self.debug      = debug
+    self.status     = None
+    self.ui         = debugger.ui
+
+    self.msgid      = 0
+    self.stacks     = []
+    self.curstack   = 0
+    self.laststack  = 0
+    self.max_children  = max_children
+    self.max_data      = max_data
+    self.max_depth     = max_depth
+    DbgSession.__init__(self,sock)
+  def copyFromParent(self, ss):
+    self.latestRes = ss.latestRes
+    self.msgid = ss.msgid
+    self.sock = ss.sock
+    self.bptsetlst  = ss.bptsetlst
+    self.bptsetids  = ss.bptsetids
+  def close(self):
+    DbgSession.close(self)
+    self.ui.normal_mode()
+  def init(self):
+    DbgSession.init(self)
+    self.command('feature_set', '-n max_children -v ' + self.max_children)
+    self.command('feature_set', '-n max_data -v ' + self.max_data)
+    self.command('feature_set', '-n max_depth -v ' + self.max_depth)
+    self.command('step_into')
+    self.command('property_get', "-n $_SERVER['REQUEST_URI']")
+  def start(self):
+    self.ui.debug_mode()
+
+    if self.latestRes != None:
+      self.handle_recvd_msg(self.latestRes)
+      self.command('stack_get')
+    else:
+      self.init()
+    self.ui.go_srcview()
+  def send_msg(self, cmd):
+    """ send message """
+    self.sock.send(cmd + '\0')
+    # log message
+    if self.debug:
+      self.ui.tracewin.write(str(self.msgid) + ' : send =====> ' + cmd)
+  def handle_recvd_msg(self, txt):
+    # log messages {{{
+    if self.debug:
+      self.ui.tracewin.write( str(self.msgid) + ' : recv <===== {{{   ' + txt)
+      self.ui.tracewin.write('}}}')
+    res = xml.dom.minidom.parseString(txt)
     """ call appropraite message handler member function, handle_XXX() """
     fc = res.firstChild
     try:
@@ -804,6 +638,7 @@ class Debugger:
     except AttributeError:
       print 'Debugger.handle_'+fc.tagName+'() not found, please see the LOG___WINDOW'
     self.ui.go_srcview()
+    return res
   def handle_response(self, res):
     """ call appropraite response message handler member function, handle_response_XXX() """
     if res.firstChild.hasAttribute('reason') and res.firstChild.getAttribute('reason') == 'error':
@@ -919,18 +754,6 @@ class Debugger:
     if res.firstChild.hasAttribute('status'):
       self.status = res.firstChild.getAttribute('status')
       return
-  def handle_response_breakpoint_set(self, res):
-    """handle <response command=breakpoint_set> tag
-    <responsponse command="breakpoint_set" id="110180001" transaction_id="1"/>"""
-    if res.firstChild.hasAttribute('id'):
-      tid = int(res.firstChild.getAttribute('transaction_id'))
-      bno = self.bptsetlst[tid]
-      del self.bptsetlst[tid]
-      self.breakpt.setid(bno, str(res.firstChild.getAttribute('id')))
-      #try:
-      #except:
-      #  print "can't find bptsetlst tid=", tid
-      #  pass
   def handle_response_eval(self, res):
     """handle <response command=eval> tag """
     self.ui.watchwin.write_xml_childs(res)
@@ -946,81 +769,6 @@ class Debugger:
   def handle_response_default(self, res):
     """handle <response command=context_get> tag """
     print res.toprettyxml()
-  #
-  #
-  #################################################################################################################
-
-  #################################################################################################################
-  # debugger command functions
-  #
-  #   usage:
-  #
-  #   dbg = Debugger()          # create Debugger Object
-  #   dbg.run()                 # run() method initialize windows, debugger connection and send breakpoints, ...
-  #   dbg.run()                 # run() method sends 'run -i ...' message
-  #   dbg.command('step_into')  # sends 'step_into' message
-  #   dbg.stop()                # stop debugger
-  #
-
-  def command(self, cmd, arg1 = '', arg2 = ''):
-    """ general command sender (receive response too) """
-    if self.running == 0:
-      print "Not connected\n"
-      return
-    msgid = self.send_command(cmd, arg1, arg2)
-    self.recv()
-    return msgid
-  def run(self):
-    """ start debugger or continue """
-    status = self.protocol.status()
-    if status == DbgProtocol.INIT:
-        self.protocol.start()
-        self.updateStatusLine("--LISN")
-    elif status == DbgProtocol.CLOSED:
-        self.protocol = DbgProtocol(self.port)
-        self.protocol.start()
-        self.updateStatusLine("--LISN")
-    elif self.protocol.sock != None:
-      self.command('run')
-      if self.status != 'stopped':
-        self.command('stack_get')
-    elif self.protocol.nextConnection() != None:
-        self.debugMode()
-  def debugMode(self):
-    self.updateStatusLine("--CONN")
-    self.ui.debug_mode()
-    self.running = 1
-
-    self.recv(1)
-
-    # set max data to get with eval results
-    self.command('feature_set', '-n max_children -v ' + self.max_children)
-    self.command('feature_set', '-n max_data -v ' + self.max_data)
-    self.command('feature_set', '-n max_depth -v ' + self.max_depth)
-
-    self.command('step_into')
-
-    flag = 0
-    for bno in self.breakpt.list():
-      msgid = self.send_command('breakpoint_set', \
-                                '-t line -f ' + self.breakpt.getfile(bno) + ' -n ' + str(self.breakpt.getline(bno)) + ' -s enabled', \
-                                self.breakpt.getexp(bno))
-      self.bptsetlst[msgid] = bno
-      flag = 1
-    if flag:
-      self.recv()
-
-    self.property_get("$_SERVER['REQUEST_URI']")
-    self.ui.go_srcview()
-
-  def quit(self):
-    self.clear()
-    self.ui.normal_mode()
-    self.updateStatusLine("--CLSD")
-    #vim.command('MiniBufExplorer')
-
-  def stop(self):
-    self.clear()
 
   def up(self):
     if self.curstack > 0:
@@ -1034,32 +782,6 @@ class Debugger:
       self.ui.stackwin.highlight_stack(self.curstack)
       self.ui.set_srcview(self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'])
 
-  def list(self):
-    self.ui.watchwin.write('--> breakpoints list: ')
-    for bno in self.breakpt.list():
-      self.ui.watchwin.write('  ' + self.breakpt.getfile(bno) + ':' + str(self.breakpt.getline(bno)))
-
-  def mark(self, exp = ''):
-    (row, rol) = vim.current.window.cursor
-    file       = vim.current.buffer.name
-
-    bno = self.breakpt.find(file, row)
-    if bno != None:
-      id = self.breakpt.getid(bno)
-      self.breakpt.remove(bno)
-      vim.command('sign unplace ' + str(bno))
-      if self.protocol.sock != None:
-        self.send_command('breakpoint_remove', '-d ' + str(id))
-        self.recv()
-    else:
-      bno = self.breakpt.add(file, row, exp)
-      vim.command('sign place ' + str(bno) + ' name=breakpt line=' + str(row) + ' file=' + file)
-      if self.protocol.sock != None:
-        msgid = self.send_command('breakpoint_set', \
-                                  '-t line -f ' + self.breakpt.getfile(bno) + ' -n ' + str(self.breakpt.getline(bno)), \
-                                  self.breakpt.getexp(bno))
-        self.bptsetlst[msgid] = bno
-        self.recv()
 
   def watch_input(self, mode, arg = ''):
     self.ui.watchwin.input(mode, arg)
@@ -1088,136 +810,287 @@ class Debugger:
     else:
       print "no commands", cmd, expr
 
+class DbgSilentClient(Thread):
+  def __init__(self, sock):
+    self.session = DbgSession(sock)
+    Thread.__init__(self)
+  def run(self):
+    self.session.init()
 
-  #
-  #
-  #################################################################################################################
+    resDom = self.session.command("run")
+    status = "stopping"
+    if resDom.firstChild.hasAttribute('status'):
+      status = resDom.firstChild.getAttribute('status')
+    if status == "stopping":
+      self.session.command("stop")
+    elif status == "break":
+      debugger.debugListener.newSession(self.session)
 
+class DbgListener(Thread):
+  (INIT,LISTEN,CLOSED) = (0,1,2)
+  """ DBGp Procotol class """
+  def __init__(self, port = 9000):
+    self.port     = port
+    self.session_queue = []
+    self._status  = self.INIT
+    self.lock = Lock()
+    Thread.__init__(self)
+  def newSession(self, ss):
+    if not isinstance(ss, DbgSessionWithUI):
+      s = DbgSessionWithUI(None)
+      s.copyFromParent(ss)
+      ss = s
+    self.lock.acquire()
+    self.session_queue.append(ss)
+    c = str(len(self.session_queue))
+    debugger.updateStatusLine("--PEND"+c)
+    self.lock.release()
+  def nextSession(self):
+    session = None
+    self.lock.acquire()
+    if len(self.session_queue) > 0:
+      session = self.session_queue.pop(0)
+    self.lock.release()
+    return session
+  def stop(self):
+    self.lock.acquire()
+    if self._status == self.LISTEN:
+      client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
+      client.connect ( ( '127.0.0.1', self.port ) )
+      client.close()
+    for s in self.session_queue:
+      s.sock.close()
+    self._status = self.CLOSED
+    self.lock.release()
+  def status(self):
+    self.lock.acquire()
+    s = self._status
+    self.lock.release()
+    return s
+  def run(self):
+    global debugger
+    serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    serv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    serv.bind(('', self.port))
+    serv.listen(5)
+    self._status = self.LISTEN
+    while 1:
+      (sock, address) = serv.accept()
+      s = self.status()
+      if s == self.LISTEN:
+        if debugger.break_at_entry:
+          self.newSession(DbgSessionWithUI(sock))
+        else:
+          client = DbgSilentClient(sock)
+          client.start()
+      else:
+        break
+    serv.close()
 
+class BreakPoint:
+  """ Breakpoint class """
+  def __init__(self):
+    """ initalize """
+    self.dictionaries  = {}
+    self.startbno = 10000
+    self.maxbno   = self.startbno
+  def clear(self):
+    """ clear of breakpoint number """
+    self.dictionaries.clear()
+    self.maxbno = self.startbno
+  def add(self, file, line, exp = ''):
+    """ add break point at file:line """
+    self.maxbno = self.maxbno + 1
+    self.dictionaries[self.maxbno] = { 'file':file, 'line':line, 'exp':exp }
+    return self.maxbno
+  def remove(self, bno):
+    """ remove break point numbered with bno """
+    del self.dictionaries[bno]
+  def find(self, file, line):
+    """ find break point and return bno(breakpoint number) """
+    for bno in self.dictionaries.keys():
+      if self.dictionaries[bno]['file'] == file and self.dictionaries[bno]['line'] == line:
+        return bno
+    return None
+  def getfile(self, bno):
+    """ get file name of breakpoint numbered with bno """
+    return self.dictionaries[bno]['file']
+  def getline(self, bno):
+    """ get line number of breakpoint numbered with bno """
+    return self.dictionaries[bno]['line']
+  def getexp(self, bno):
+    """ get expression of breakpoint numbered with bno """
+    return self.dictionaries[bno]['exp']
+  def list(self):
+    """ return list of breakpoint number """
+    return self.dictionaries.keys()
 
-#################################################################################################################
-#
-# Try - Catch Wrapper 
-#
-#################################################################################################################
+class Debugger:
+  """ Main Debugger class """
+  def __init__(self, port = 9000, max_children = '32', max_data = '1024', max_depth = '1', debug = 0, break_at_entry = 1):
+    """ initialize Debugger """
+    self.port       = port
 
+    self.break_at_entry= break_at_entry
+    self.debugSession  = DbgSession(None)
+    self.debugListener = DbgListener(self.port)
+    vim.command('sign unplace *')
+
+    self.statusline = vim.eval('&statusline')
+    if self.statusline == "":
+      self.statusline="%<%f\ %h%m%r\ \[%{&ff}:%{&fenc}:%Y]\ %{getcwd()}%{(g:cscope_db_root==getcwd()&&g:has_cscope_db==1)?'*':''}\ %=%-10{(&expandtab)?'ExpandTab-'.&tabstop:'NoExpandTab'}\ %=%-10.(%l,%c%V%)\ %P"
+    self.breakpt    = BreakPoint()
+    self.ui         = DebugUI()
+    self.mode       = 0
+  def resize(self):
+    self.mode = self.mode + 1
+    if self.mode >= 3:
+      self.mode = 0
+  
+    if self.mode == 0:
+      vim.command("wincmd =")
+    elif self.mode == 1:
+      vim.command("wincmd |")
+    if self.mode == 2:
+      vim.command("wincmd _")
+
+  def command(self, msg, arg1 = '', arg2 = ''):
+    try:
+      if self.debugSession.sock == None:
+        print 'No debug session started.'
+      else:
+        self.debugSession.command(msg, arg1, arg2)
+        if self.debugSession.status != 'stopping':
+          self.debugSession.command('stack_get')
+    except:
+      self.ui.tracewin.write(sys.exc_info())
+      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
+      self.stop()
+      print 'Connection closed, stop debugging', sys.exc_info()
+  def watch_input(self, cmd, arg = ''):
+    try:
+      if self.debugSession.sock == None:
+        print 'No debug session started.'
+      else:
+        if arg == '<cword>':
+          arg = vim.eval('expand("<cword>")')
+        self.debugSession.watch_input(cmd, arg)
+    except:
+      self.ui.tracewin.write( sys.exc_info() )
+      self.ui.tracewin.write( "".join(traceback.format_tb(sys.exc_info()[2])) )
+      self.stop()
+      print 'Connection closed, stop debugging'
+  def property(self, name = ''):
+    try:
+      if self.debugSession.sock == None:
+        print 'No debug session started.'
+      else:
+        self.debugSession.property_get(name)
+    except:
+      self.ui.tracewin.write(sys.exc_info())
+      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
+      self.stop()
+      print 'Connection closed, stop debugging', sys.exc_info()
+  def up(self):
+    try:
+      if self.debugSession.sock == None:
+        print 'No debug session started.'
+      else:
+        self.debugSession.up()
+    except:
+      self.ui.tracewin.write(sys.exc_info())
+      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
+      self.stop()
+      print 'Connection closed, stop debugging', sys.exc_info()
+  
+  def down(self):
+    try:
+      if self.debugSession.sock == None:
+        print 'No debug session started.'
+      else:
+        self.debugSession.down()
+    except:
+      self.ui.tracewin.write(sys.exc_info())
+      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
+      self.stop()
+      print 'Connection closed, stop debugging', sys.exc_info()
+  def run(self):
+    """ start debugger or continue """
+    try:
+      status = self.debugListener.status()
+      if status == DbgListener.INIT:
+          self.debugListener.start()
+          self.updateStatusLine("--LISN")
+      elif status == DbgListener.CLOSED:
+          self.debugListener = DbgListener(self.port)
+          self.debugListener.start()
+          self.updateStatusLine("--LISN")
+      elif self.debugSession.sock != None:
+        self.debugSession.command('run')
+        if self.debugSession.status != 'stopping':
+          self.debugSession.command('stack_get')
+      else:
+        session = self.debugListener.nextSession()
+        if session != None:
+          self.debugSession = session
+          self.updateStatusLine("--CONN")
+          self.debugSession.start()
+    except:
+      self.ui.tracewin.write(sys.exc_info())
+      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
+      self.stop()
+      print 'Connection closed, stop debugging', sys.exc_info()
+
+  def list(self):
+    self.ui.watchwin.write('--> breakpoints list: ')
+    for bno in self.breakpt.list():
+      self.ui.watchwin.write('  ' + self.breakpt.getfile(bno) + ':' + str(self.breakpt.getline(bno)))
+
+  def mark(self, exp = ''):
+    (row, rol) = vim.current.window.cursor
+    file       = vim.current.buffer.name
+
+    bno = self.breakpt.find(file, row)
+    if bno != None:
+      self.breakpt.remove(bno)
+      vim.command('sign unplace ' + str(bno))
+      id = self.debugSession.getbid(bno)
+      if self.debugSession.sock != None and id != None:
+        self.debugSession.send_command('breakpoint_remove', '-d ' + str(id))
+        self.debugSession.ack_command()
+    else:
+      bno = self.breakpt.add(file, row, exp)
+      vim.command('sign place ' + str(bno) + ' name=breakpt line=' + str(row) + ' file=' + file)
+      if self.debugSession.sock != None:
+        msgid = self.send_command('breakpoint_set', \
+                                  '-t line -f ' + self.breakpt.getfile(bno) + ' -n ' + str(self.breakpt.getline(bno)), \
+                                  self.breakpt.getexp(bno))
+        self.debugSession.bptsetlst[msgid] = bno
+        self.debugSession.ack_command()
+
+  def updateStatusLine(self,msg):
+    sl = self.statusline+"%{'"+msg+"'}"
+    vim.command("let &statusline=\""+sl+"\"")
+
+  def clear(self):
+    self.debugListener.stop()
+    self.debugSession.close()
+  def quit(self):
+    self.clear()
+    self.debugSession.close()
+    self.updateStatusLine("--CLSD")
+  def stop(self):
+    self.clear()
+    self.updateStatusLine("--CLSD")
 
 def debugger_init(debug = 0):
   global debugger
-
-  # get needed vim variables
-
-  # port that the engine will connect on
   port = int(vim.eval('debuggerPort'))
-  if port == 0:
-    port = 9000
-
-  # the max_depth variable to set in the engine
   max_children = vim.eval('debuggerMaxChildren')
-  if max_children == '':
-    max_children = '32'
-
   max_data = vim.eval('debuggerMaxData')
-  if max_data == '':
-    max_data = '1024'
-
   max_depth = vim.eval('debuggerMaxDepth')
-  if max_depth == '':
-    max_depth = '1'
-
-  minibufexpl = int(vim.eval('debuggerMiniBufExpl'))
-  if minibufexpl == 0:
-    minibufexpl = 0
-
-  debugger = Debugger(port, max_children, max_data, max_depth, minibufexpl, debug)
-
-def debugger_command(msg, arg1 = '', arg2 = ''):
-  try:
-    debugger.command(msg, arg1, arg2)
-    if debugger.status != 'stopped':
-      debugger.command('stack_get')
-  except:
-    debugger.ui.tracewin.write(sys.exc_info())
-    debugger.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-    debugger.stop()
-    print 'Connection closed, stop debugging', sys.exc_info()
-
-def debugger_run():
-  try:
-    debugger.run()
-  except:
-    debugger.ui.tracewin.write(sys.exc_info())
-    debugger.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-
-def debugger_watch_input(cmd, arg = ''):
-  try:
-    if arg == '<cword>':
-      arg = vim.eval('expand("<cword>")')
-    debugger.watch_input(cmd, arg)
-  except:
-    debugger.ui.tracewin.write( sys.exc_info() )
-    debugger.ui.tracewin.write( "".join(traceback.format_tb(sys.exc_info()[2])) )
-    debugger.stop()
-    print 'Connection closed, stop debugging'
-
-def debugger_context():
-  try:
-    debugger.command('context_get')
-  except:
-    debugger.ui.tracewin.write(sys.exc_info())
-    debugger.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-    debugger.stop()
-    print 'Connection closed, stop debugging'
-
-def debugger_property(name = ''):
-  try:
-    debugger.property_get(name)
-  except:
-    debugger.ui.tracewin.write(sys.exc_info())
-    debugger.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-    debugger.stop()
-    print 'Connection closed, stop debugging', sys.exc_info()
-
-def debugger_mark(exp = ''):
-  try:
-    debugger.mark(exp)
-  except:
-    debugger.ui.tracewin.write(sys.exc_info())
-    debugger.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-    debugger.stop()
-    print 'Connection closed, stop debugging', sys.exc_info()
-
-def debugger_up():
-  try:
-    debugger.up()
-  except:
-    debugger.ui.tracewin.write(sys.exc_info())
-    debugger.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-    debugger.stop()
-    print 'Connection closed, stop debugging', sys.exc_info()
-
-def debugger_down():
-  try:
-    debugger.down()
-  except:
-    debugger.ui.tracewin.write(sys.exc_info())
-    debugger.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-    debugger.stop()
-    print 'Connection closed, stop debugging', sys.exc_info()
-
-mode = 0
-def debugger_resize():
-  global mode
-  mode = mode + 1
-  if mode >= 3:
-    mode = 0
-
-  if mode == 0:
-    vim.command("wincmd =")
-  elif mode == 1:
-    vim.command("wincmd |")
-  if mode == 2:
-    vim.command("wincmd _")
+  bae      = vim.eval('debuggerBreakAtEntry')
+  debugger = Debugger(port, max_children, max_data, max_depth, debug, bae)
 
 error_msg = { \
     # 000 Command parsing errors
