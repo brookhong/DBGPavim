@@ -139,6 +139,6 @@ endif
 if !exists('g:debuggerBreakAtEntry')
   let g:debuggerBreakAtEntry = 1
 endif
-python debugger_init(1)
+python debugger_init()
 set laststatus=2
 autocmd VimLeavePre * python debugger.quit()

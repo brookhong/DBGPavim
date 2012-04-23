@@ -580,8 +580,7 @@ class DbgSession:
       self.ack_command()
 
 class DbgSessionWithUI(DbgSession):
-  def __init__(self, sock, max_children = '32', max_data = '1024', max_depth = '1', debug = 0):
-    self.debug      = debug
+  def __init__(self, sock):
     self.status     = None
     self.ui         = debugger.ui
 
@@ -589,9 +588,6 @@ class DbgSessionWithUI(DbgSession):
     self.stacks     = []
     self.curstack   = 0
     self.laststack  = 0
-    self.max_children  = max_children
-    self.max_data      = max_data
-    self.max_depth     = max_depth
     DbgSession.__init__(self,sock)
   def copyFromParent(self, ss):
     self.latestRes = ss.latestRes
@@ -599,22 +595,21 @@ class DbgSessionWithUI(DbgSession):
     self.sock = ss.sock
     self.bptsetlst  = ss.bptsetlst
     self.bptsetids  = ss.bptsetids
-  def close(self):
-    DbgSession.close(self)
-    self.ui.normal_mode()
   def init(self):
     DbgSession.init(self)
-    self.command('feature_set', '-n max_children -v ' + self.max_children)
-    self.command('feature_set', '-n max_data -v ' + self.max_data)
-    self.command('feature_set', '-n max_depth -v ' + self.max_depth)
+    self.command('feature_set', '-n max_children -v ' + debugger.max_children)
+    self.command('feature_set', '-n max_data -v ' + debugger.max_data)
+    self.command('feature_set', '-n max_depth -v ' + debugger.max_depth)
     self.command('step_into')
     self.command('property_get', "-n $_SERVER['REQUEST_URI']")
   def start(self):
+    debugger.updateStatusLine("--CONN")
     self.ui.debug_mode()
 
     if self.latestRes != None:
       self.handle_recvd_msg(self.latestRes)
       self.command('stack_get')
+      self.command('property_get', "-n $_SERVER['REQUEST_URI']")
     else:
       self.init()
     self.ui.go_srcview()
@@ -622,11 +617,11 @@ class DbgSessionWithUI(DbgSession):
     """ send message """
     self.sock.send(cmd + '\0')
     # log message
-    if self.debug:
+    if debugger.debug:
       self.ui.tracewin.write(str(self.msgid) + ' : send =====> ' + cmd)
   def handle_recvd_msg(self, txt):
     # log messages {{{
-    if self.debug:
+    if debugger.debug:
       self.ui.tracewin.write( str(self.msgid) + ' : recv <===== {{{   ' + txt)
       self.ui.tracewin.write('}}}')
     res = xml.dom.minidom.parseString(txt)
@@ -829,12 +824,15 @@ class DbgSilentClient(Thread):
 class DbgListener(Thread):
   (INIT,LISTEN,CLOSED) = (0,1,2)
   """ DBGp Procotol class """
-  def __init__(self, port = 9000):
+  def __init__(self, port):
     self.port     = port
     self.session_queue = []
     self._status  = self.INIT
     self.lock = Lock()
     Thread.__init__(self)
+  def start(self):
+    debugger.updateStatusLine("--LISN")
+    Thread.start(self)
   def newSession(self, ss):
     if not isinstance(ss, DbgSessionWithUI):
       s = DbgSessionWithUI(None)
@@ -845,6 +843,7 @@ class DbgListener(Thread):
     c = str(len(self.session_queue))
     debugger.updateStatusLine("--PEND"+c)
     self.lock.release()
+    print c+" pending connection(s) to be debug, press <F5> to continue."
   def nextSession(self):
     session = None
     self.lock.acquire()
@@ -862,6 +861,7 @@ class DbgListener(Thread):
       s.sock.close()
     self._status = self.CLOSED
     self.lock.release()
+    debugger.updateStatusLine("--CLSD")
   def status(self):
     self.lock.acquire()
     s = self._status
@@ -927,21 +927,26 @@ class BreakPoint:
 
 class Debugger:
   """ Main Debugger class """
-  def __init__(self, port = 9000, max_children = '32', max_data = '1024', max_depth = '1', debug = 0, break_at_entry = 1):
+  def __init__(self):
     """ initialize Debugger """
-    self.port       = port
-
-    self.break_at_entry= break_at_entry
-    self.debugSession  = DbgSession(None)
+    self.debug = 1
+    self.loadSettings()
     self.debugListener = DbgListener(self.port)
+    self.debugSession  = DbgSession(None)
     vim.command('sign unplace *')
 
     self.statusline = vim.eval('&statusline')
     if self.statusline == "":
-      self.statusline="%<%f\ %h%m%r\ \[%{&ff}:%{&fenc}:%Y]\ %{getcwd()}%{(g:cscope_db_root==getcwd()&&g:has_cscope_db==1)?'*':''}\ %=%-10{(&expandtab)?'ExpandTab-'.&tabstop:'NoExpandTab'}\ %=%-10.(%l,%c%V%)\ %P"
+      self.statusline="%<%f\ %h%m%r\ \[%{&ff}:%{&fenc}:%Y]\ %{getcwd()}\ %=%-10{(&expandtab)?'ExpandTab-'.&tabstop:'NoExpandTab'}\ %=%-10.(%l,%c%V%)\ %P"
     self.breakpt    = BreakPoint()
     self.ui         = DebugUI()
     self.mode       = 0
+  def loadSettings(self):
+    self.port = int(vim.eval('debuggerPort'))
+    self.max_children = vim.eval('debuggerMaxChildren')
+    self.max_data = vim.eval('debuggerMaxData')
+    self.max_depth = vim.eval('debuggerMaxDepth')
+    self.break_at_entry = int(vim.eval('debuggerBreakAtEntry'))
   def resize(self):
     self.mode = self.mode + 1
     if self.mode >= 3:
@@ -953,7 +958,17 @@ class Debugger:
       vim.command("wincmd |")
     if self.mode == 2:
       vim.command("wincmd _")
-
+  def handle_exception(self):
+      self.ui.tracewin.write(sys.exc_info())
+      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
+      self.debugSession.close()
+      session = self.debugListener.nextSession()
+      if session != None:
+        self.debugSession = session
+        self.debugSession.start()
+      else:
+        self.ui.normal_mode()
+        debugger.updateStatusLine("--LISN")
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:
@@ -963,10 +978,7 @@ class Debugger:
         if self.debugSession.status != 'stopping':
           self.debugSession.command('stack_get')
     except:
-      self.ui.tracewin.write(sys.exc_info())
-      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-      self.stop()
-      print 'Connection closed, stop debugging', sys.exc_info()
+      self.handle_exception()
   def watch_input(self, cmd, arg = ''):
     try:
       if self.debugSession.sock == None:
@@ -976,10 +988,7 @@ class Debugger:
           arg = vim.eval('expand("<cword>")')
         self.debugSession.watch_input(cmd, arg)
     except:
-      self.ui.tracewin.write( sys.exc_info() )
-      self.ui.tracewin.write( "".join(traceback.format_tb(sys.exc_info()[2])) )
-      self.stop()
-      print 'Connection closed, stop debugging'
+      self.handle_exception()
   def property(self, name = ''):
     try:
       if self.debugSession.sock == None:
@@ -987,10 +996,7 @@ class Debugger:
       else:
         self.debugSession.property_get(name)
     except:
-      self.ui.tracewin.write(sys.exc_info())
-      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-      self.stop()
-      print 'Connection closed, stop debugging', sys.exc_info()
+      self.handle_exception()
   def up(self):
     try:
       if self.debugSession.sock == None:
@@ -998,10 +1004,7 @@ class Debugger:
       else:
         self.debugSession.up()
     except:
-      self.ui.tracewin.write(sys.exc_info())
-      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-      self.stop()
-      print 'Connection closed, stop debugging', sys.exc_info()
+      self.handle_exception()
   
   def down(self):
     try:
@@ -1010,21 +1013,15 @@ class Debugger:
       else:
         self.debugSession.down()
     except:
-      self.ui.tracewin.write(sys.exc_info())
-      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-      self.stop()
-      print 'Connection closed, stop debugging', sys.exc_info()
+      self.handle_exception()
   def run(self):
     """ start debugger or continue """
     try:
       status = self.debugListener.status()
-      if status == DbgListener.INIT:
-          self.debugListener.start()
-          self.updateStatusLine("--LISN")
-      elif status == DbgListener.CLOSED:
-          self.debugListener = DbgListener(self.port)
-          self.debugListener.start()
-          self.updateStatusLine("--LISN")
+      if status == DbgListener.INIT or status == DbgListener.CLOSED:
+        self.loadSettings()
+        self.debugListener = DbgListener(self.port)
+        self.debugListener.start()
       elif self.debugSession.sock != None:
         self.debugSession.command('run')
         if self.debugSession.status != 'stopping':
@@ -1033,13 +1030,9 @@ class Debugger:
         session = self.debugListener.nextSession()
         if session != None:
           self.debugSession = session
-          self.updateStatusLine("--CONN")
           self.debugSession.start()
     except:
-      self.ui.tracewin.write(sys.exc_info())
-      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-      self.stop()
-      print 'Connection closed, stop debugging', sys.exc_info()
+      self.handle_exception()
 
   def list(self):
     self.ui.watchwin.write('--> breakpoints list: ')
@@ -1072,25 +1065,14 @@ class Debugger:
     sl = self.statusline+"%{'"+msg+"'}"
     vim.command("let &statusline=\""+sl+"\"")
 
-  def clear(self):
-    self.debugListener.stop()
-    self.debugSession.close()
   def quit(self):
-    self.clear()
+    self.ui.normal_mode()
     self.debugSession.close()
-    self.updateStatusLine("--CLSD")
-  def stop(self):
-    self.clear()
-    self.updateStatusLine("--CLSD")
+    self.debugListener.stop()
 
-def debugger_init(debug = 0):
+def debugger_init():
   global debugger
-  port = int(vim.eval('debuggerPort'))
-  max_children = vim.eval('debuggerMaxChildren')
-  max_data = vim.eval('debuggerMaxData')
-  max_depth = vim.eval('debuggerMaxDepth')
-  bae      = vim.eval('debuggerBreakAtEntry')
-  debugger = Debugger(port, max_children, max_data, max_depth, debug, bae)
+  debugger = Debugger()
 
 error_msg = { \
     # 000 Command parsing errors
