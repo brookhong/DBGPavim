@@ -359,17 +359,21 @@ class HelpWindow(VimWindow):
         '                                  | :Dn stack down        \n' + \
         '  <F11>  get all context          | :Bl list breakpoints  \n' + \
         '  <F12>  get property at cursor   | :Pg property get      \n' + \
+        '                     | :Dh toggle help window             \n' + \
+        '                     | :Bae <0|1> set debuggerBreakAtEntry\n' + \
         '\n')
     self.command('1')
 
 class DebugUI:
   """ DEBUGUI class """
-  def __init__(self):
+  def __init__(self, debug):
     """ initialize object """
+    self.debug = debug
     self.watchwin = WatchWindow()
     self.stackwin = StackWindow()
-    self.tracewin = TraceWindow()
-    self.helpwin  = HelpWindow('HELP__WINDOW')
+    self.helpwin  = None
+    if self.debug:
+      self.tracewin = TraceWindow()
     self.mode     = 0 # normal mode
     self.file     = None
     self.line     = None
@@ -429,21 +433,29 @@ class DebugUI:
   def create(self):
     """ create windows """
     self.watchwin.create('vertical belowright new')
-    self.helpwin.create('belowright new')
     self.stackwin.create('belowright new')
-    self.tracewin.create('belowright new')
+    if self.debug:
+      self.tracewin.create('belowright new')
 
   def set_highlight(self):
     """ set vim highlight of debugger sign """
     vim.command("highlight DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse")
     vim.command("highlight DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse")
 
+  def help(self):
+    if self.helpwin:
+      self.helpwin.destroy()
+      self.helpwin = None
+    else:
+      self.helpwin  = HelpWindow('HELP__WINDOW')
+      self.helpwin.create('belowright new')
+
   def destroy(self):
     """ destroy windows """
-    self.helpwin.destroy()
     self.watchwin.destroy()
     self.stackwin.destroy()
-    self.tracewin.destroy()
+    if self.debug:
+      self.tracewin.destroy()
   def go_srcview(self):
     vim.command('1wincmd w')
   def next_sign(self):
@@ -537,7 +549,8 @@ class DbgSession:
     self.sock.send(cmd + '\0')
   def handle_recvd_msg(self, res):
     resDom = xml.dom.minidom.parseString(res)
-    #debugger.ui.tracewin.write(res)
+    if debugger.debug:
+      debugger.ui.tracewin.write(res)
     if resDom.firstChild.tagName == "response" and resDom.firstChild.getAttribute('command') == "breakpoint_set":
       self.handle_response_breakpoint_set(resDom)
     return resDom
@@ -678,7 +691,8 @@ class DbgSessionWithUI(DbgSession):
 
   def handle_response_error(self, res):
     """ handle <error> tag """
-    self.ui.tracewin.write_xml_childs(res)
+    if debugger.debug:
+      self.ui.tracewin.write_xml_childs(res)
     errors  = res.getElementsByTagName('error')
     for error in errors:
       code = int(error.getAttribute('code'))
@@ -765,6 +779,12 @@ class DbgSessionWithUI(DbgSession):
     """handle <response command=context_get> tag """
     print res.toprettyxml()
 
+  def go(self, stack):
+    if stack >= 0 and stack <= self.laststack:
+      self.curstack = stack
+      self.ui.stackwin.highlight_stack(self.curstack)
+      self.ui.set_srcview(self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'])
+
   def up(self):
     if self.curstack > 0:
       self.curstack -= 1
@@ -785,7 +805,7 @@ class DbgSessionWithUI(DbgSession):
     if name == '':
       name = vim.eval('expand("<cword>")')
     self.ui.watchwin.write('--> property_get: '+name)
-    self.command('property_get', '-n '+name)
+    self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
     
   def watch_execute(self):
     """ execute command in watch window """
@@ -929,7 +949,7 @@ class Debugger:
   """ Main Debugger class """
   def __init__(self):
     """ initialize Debugger """
-    self.debug = 1
+    self.debug = 0
     self.loadSettings()
     self.debugListener = DbgListener(self.port)
     self.debugSession  = DbgSession(None)
@@ -939,7 +959,7 @@ class Debugger:
     if self.statusline == "":
       self.statusline="%<%f\ %h%m%r\ \[%{&ff}:%{&fenc}:%Y]\ %{getcwd()}\ %=%-10{(&expandtab)?'ExpandTab-'.&tabstop:'NoExpandTab'}\ %=%-10.(%l,%c%V%)\ %P"
     self.breakpt    = BreakPoint()
-    self.ui         = DebugUI()
+    self.ui         = DebugUI(self.debug)
     self.mode       = 0
   def loadSettings(self):
     self.port = int(vim.eval('debuggerPort'))
@@ -959,16 +979,17 @@ class Debugger:
     if self.mode == 2:
       vim.command("wincmd _")
   def handle_exception(self):
+    if debugger.debug:
       self.ui.tracewin.write(sys.exc_info())
       self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-      self.debugSession.close()
-      session = self.debugListener.nextSession()
-      if session != None:
-        self.debugSession = session
-        self.debugSession.start()
-      else:
-        self.ui.normal_mode()
-        debugger.updateStatusLine("--LISN")
+    self.debugSession.close()
+    session = self.debugListener.nextSession()
+    if session != None:
+      self.debugSession = session
+      self.debugSession.start()
+    else:
+      self.ui.normal_mode()
+      debugger.updateStatusLine("--LISN")
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:

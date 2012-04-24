@@ -1,3 +1,4 @@
+" vim: tabstop=2 shiftwidth=2 softtabstop=2 expandtab
 " DBGp client: a remote debugger interface to the DBGp protocol
 "
 " Script Info and Documentation  {{{
@@ -116,12 +117,26 @@ function! Bae(val)
   let g:debuggerBreakAtEntry = a:val
   execute 'python debugger.break_at_entry = '.a:val
 endfunction
-command! -nargs=1 Bae :call Bae('<args>')
+function! WatchWindowOnEnter()
+  execute "Pg ".substitute(getline("."),"\\s*\\(\\S*\\)\\s*=.*","\\1","g")
+  execute "normal \<c-w>p"
+endfunction
+function! StackWindowOnEnter()
+  let l:stackNo = substitute(getline("."),"\\(\\d\\+\\)\\s\\+.*","\\1","g")
+  if l:stackNo =~ "^\\d\\+$" 
+    execute 'python debugger.debugSession.go('.l:stackNo.')'
+    execute "normal \<c-w>p"
+  endif
+endfunction
+autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
+autocmd BufEnter STACK_WINDOW map <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>
 command! -nargs=? Bp python debugger.mark('<args>')
-command! -nargs=0 Bl python debugger.list()
-command! -nargs=? Pg python debugger.property("<args>")
 command! -nargs=0 Up python debugger.up()
 command! -nargs=0 Dn python debugger.down()
+command! -nargs=0 Bl python debugger.list()
+command! -nargs=? Pg python debugger.property("<args>")
+command! -nargs=1 Bae :call Bae('<args>')
+command! -nargs=0 Dh python debugger.ui.help()
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
 if !exists('g:debuggerPort')
