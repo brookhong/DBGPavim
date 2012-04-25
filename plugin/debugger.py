@@ -81,6 +81,10 @@ class VimWindow:
   def getwinnr(self):
     return int(vim.eval("bufwinnr('"+self.name+"')"))
 
+  def focus(self):
+    winnr = self.getwinnr()
+    vim.command(str(winnr) + 'wincmd w')
+
   def xml_on_element(self, node):
     line = str(node.nodeName)
     if node.hasAttributes():
@@ -349,19 +353,19 @@ class HelpWindow(VimWindow):
     VimWindow.__init__(self, name)
   def on_create(self):
     self.write(                                                          \
-        '[ Function Keys ]                 |                       \n' + \
-        '  <F1>   resize                   | [ Normal Mode ]       \n' + \
-        '  <F2>   step into                |   ,pe  eval           \n' + \
-        '  <F3>   step over                |                       \n' + \
-        '  <F4>   step out                 | [ Command Mode ]      \n' + \
-        '  <F5>   run                      | :Bp toggle breakpoint \n' + \
-        '  <F6>   quit debugging           | :Up stack up          \n' + \
-        '                                  | :Dn stack down        \n' + \
-        '  <F11>  get all context          | :Bl list breakpoints  \n' + \
-        '  <F12>  get property at cursor   | :Pg property get      \n' + \
-        '                     | :Dh toggle help window             \n' + \
-        '                     | :Bae <0|1> set debuggerBreakAtEntry\n' + \
-        '\n')
+        '[ Function Keys ]                    | [ Command Mode ]             \n' + \
+        '  <F1>   toggle help window          | :Bp toggle breakpoint        \n' + \
+        '  <F2>   step into                   | :Up stack up                 \n' + \
+        '  <F3>   step over                   | :Dn stack down               \n' + \
+        '  <F4>   step out                    | :Bl list breakpoints         \n' + \
+        '  <F5>   run                         | :Pg property get             \n' + \
+        '  <F6>   quit debugging              |                              \n' + \
+        '  <F7>   eval                        | <F11>  get all context       \n' + \
+        '  <F8>   toggle debuggerBreakAtEntry | <F12>  get property at cursor\n' + \
+        '                                                                    \n' + \
+        '  For more instructions and latest version,                         \n' + \
+        '               pleae refer to https://github.com/brookhong/DBGPavim \n' + \
+        '')
     self.command('1')
 
 class DebugUI:
@@ -406,11 +410,13 @@ class DebugUI:
 
     self.set_highlight()
 
+    vim.command('call CreateFunctionKeys()')
   def normal_mode(self):
     """ restore mode to normal """
     if self.mode == 0: # is normal mode ?
       return
 
+    vim.command('call ClearFunctionKeys()')
     vim.command('sign unplace 1')
     vim.command('sign unplace 2')
 
@@ -432,8 +438,9 @@ class DebugUI:
     self.cursign = None
   def create(self):
     """ create windows """
-    self.watchwin.create('vertical belowright new')
-    self.stackwin.create('belowright new')
+    self.stackwin.create('belowright 12 new')
+    vim.command("wincmd w")
+    self.watchwin.create('vertical belowright 60 new')
     if self.debug:
       self.tracewin.create('belowright new')
 
@@ -448,7 +455,8 @@ class DebugUI:
       self.helpwin = None
     else:
       self.helpwin  = HelpWindow('HELP__WINDOW')
-      self.helpwin.create('belowright new')
+      self.stackwin.focus()
+      self.helpwin.create('vertical new')
 
   def destroy(self):
     """ destroy windows """
@@ -490,8 +498,8 @@ class DbgSession:
     self.latestRes = None
     self.msgid = 0
     self.sock = sock
-    self.bptsetlst  = {} 
-    self.bptsetids  = {} 
+    self.bptsetlst  = {}
+    self.bptsetids  = {}
   def handle_response_breakpoint_set(self, res):
     """handle <response command=breakpoint_set> tag
     <responsponse command="breakpoint_set" id="110180001" transaction_id="1"/>"""
@@ -682,7 +690,7 @@ class DbgSessionWithUI(DbgSession):
         Copyright (c) 2002-2004 by Derick Rethans
       </copyright>
     </init>"""
-   
+
     if sys.platform == 'win32':
       file = res.firstChild.getAttribute('fileuri')[8:]
     else:
@@ -785,6 +793,9 @@ class DbgSessionWithUI(DbgSession):
       self.ui.stackwin.highlight_stack(self.curstack)
       self.ui.set_srcview(self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'])
 
+  def jump(self, fn, line):
+    self.ui.set_srcview(fn, line)
+
   def up(self):
     if self.curstack > 0:
       self.curstack -= 1
@@ -806,7 +817,7 @@ class DbgSessionWithUI(DbgSession):
       name = vim.eval('expand("<cword>")')
     self.ui.watchwin.write('--> property_get: '+name)
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
-    
+
   def watch_execute(self):
     """ execute command in watch window """
     (cmd, expr) = self.ui.watchwin.get_command()
@@ -971,7 +982,7 @@ class Debugger:
     self.mode = self.mode + 1
     if self.mode >= 3:
       self.mode = 0
-  
+
     if self.mode == 0:
       vim.command("wincmd =")
     elif self.mode == 1:
@@ -1026,7 +1037,7 @@ class Debugger:
         self.debugSession.up()
     except:
       self.handle_exception()
-  
+
   def down(self):
     try:
       if self.debugSession.sock == None:
@@ -1058,7 +1069,7 @@ class Debugger:
   def list(self):
     self.ui.watchwin.write('--> breakpoints list: ')
     for bno in self.breakpt.list():
-      self.ui.watchwin.write('  ' + self.breakpt.getfile(bno) + ':' + str(self.breakpt.getline(bno)))
+      self.ui.watchwin.write(str(bno)+'  ' + self.breakpt.getfile(bno) + ':' + str(self.breakpt.getline(bno)))
 
   def mark(self, exp = ''):
     (row, rol) = vim.current.window.cursor
@@ -1076,7 +1087,7 @@ class Debugger:
       bno = self.breakpt.add(file, row, exp)
       vim.command('sign place ' + str(bno) + ' name=breakpt line=' + str(row) + ' file=' + file)
       if self.debugSession.sock != None:
-        msgid = self.send_command('breakpoint_set', \
+        msgid = self.debugSession.send_command('breakpoint_set', \
                                   '-t line -f ' + self.breakpt.getfile(bno) + ' -n ' + str(self.breakpt.getline(bno)), \
                                   self.breakpt.getexp(bno))
         self.debugSession.bptsetlst[msgid] = bno

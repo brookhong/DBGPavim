@@ -1,8 +1,8 @@
-This is a plugin to enable php debug in VIM with Xdebug, which is based on
-http://www.vim.org/scripts/script.php?script_id=1152
-http://www.vim.org/scripts/script.php?script_id=1929
+This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
+But most of the code, especially the debugger engine has been rewritten.
 
-## My enhancements are --
+
+## The enhancements are --
 
 ### Non blocking debugger engine.
 So that VIM users do not need to wait for connection from apache server. No timeout things, users press F5 to start debugger engine, and uses his/her VIM normally. Debug engine won't stop users to interact with VIM. Users can press F6 to stop debugger engine anytime.
@@ -16,26 +16,32 @@ This is very important for a large website, especially for thoes pages who conta
 
     The setting will cause debugger engine to break only at breakpoints. Default value is 1, which means it works like before, the debugger engine breaks at entry.
 
-### Other new commands
+### new commands and function keys
 
-    Pg        => to print value of complex variables like $this->savings[3]
+In normal mode
+
+    <F5>      => start debugger engine
+    <F6>      => stop debugger engine
+    <F8>      => toggle debuggerBreakAtEntry, when g:debuggerBreakAtEntry=0, debugger engine breaks only at breakpoints.
+
     Bl        => to list all breakpoints
-    Bae       => set debuggerBreakAtEntry, for example, :Bae 0 will set g:debuggerBreakAtEntry=0, which causes debugger engine breaks only at breakpoints.
-
-Existing commands --
-
     Bp        => toggle breakpoint on current line
-    Up        => goto upper level of stack 
-    Dn        => goto lower level of stack 
-    ,pe       => evalute expression and display result. cursor is automatically move to watch window. type line and just press enter. 
+
 In debuggin mode 
-    <F1>      => resizing windows 
+
+    <F1>      => toggle help window
     <F2>      => step into 
     <F3>      => step over 
     <F4>      => step out 
+    <F5>      => start debugging / run
     <F6>      => stop debugging 
+    <F7>      => evalute expression and display result. cursor is automatically move to watch window. type line and just press enter. 
     <F11>     => shows all variables 
     <F12>     => shows variable on current cursor 
+
+    :Pg        => to print value of complex variables like $this->savings[3]
+    :Up        => goto upper level of stack 
+    :Dn        => goto lower level of stack 
 
 ### Windows Support
 
@@ -49,27 +55,30 @@ In debuggin mode
 
 ## Usage
 
-### Install xdebug for php, and edit php.ini
+* Make sure your vim has python(above 2.3) supported.
+
+* Install xdebug for php, and edit php.ini
 
     zend_extension=<path_to_xdebug.so>
     xdebug.remote_enable=1
 
-### Edit your ~/.vimrc
+* Edit your ~/.vimrc
 
     let g:debuggerPort = 6789
     let g:debuggerBreakAtEntry = 0
 
-### Edit your apche configure file
-In your VirtualHost section, set debugger port same as the one in your vimrc
+* Edit your apche configure file
+
+    In your VirtualHost section, set debugger port same as the one in your vimrc
 
     php_value xdebug.remote_port 6789
 
-### Save debugger.py and debugger.vim to your ~/.vimr/plugin
+* Save debugger.py and debugger.vim to your ~/.vimr/plugin
 
-### Open your php file, use :Bp to set breakpoints
+* Open your php file, use :Bp to set breakpoints
 
-### Now, press F5 to start debugger engine
+* Now, press F5 to start debugger engine
 
-### Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1. If you would like to debug from CLI, start your php script like 
+* Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1. If you would like to debug from CLI, start your php script like 
 
     php -dxdebug.remote_autostart=1 -dxdebug.remote_port 6789 test.php

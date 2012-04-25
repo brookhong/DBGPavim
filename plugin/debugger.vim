@@ -87,39 +87,54 @@ else
   call confirm('debugger.vim: Unable to find '.s:debugger_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
 endif
 
-map <F1> :python debugger.resize()<cr>
-map <F2> :python debugger.command('step_into')<cr>
-map <F3> :python debugger.command('step_over')<cr>
-map <F4> :python debugger.command('step_out')<cr>
+map <silent> <F5> :python debugger.run()<cr>
+map <silent> <F6> :python debugger.quit()<cr>
+map <silent> <F8> :call Bae()<cr>
+command! -nargs=? Bp python debugger.mark('<args>')
+command! -nargs=0 Bl python debugger.list()
+function! CreateFunctionKeys()
+  map <silent> <F1> :python debugger.ui.help()<cr>
+  map <silent> <F2> :python debugger.command('step_into')<cr>
+  map <silent> <F3> :python debugger.command('step_over')<cr>
+  map <silent> <F4> :python debugger.command('step_out')<cr>
+  map <silent> <F7> :python debugger.watch_input("eval")<cr>A
+  map <silent> <F9> :python debugger.resize()<cr>
+  map <silent> <F11> :python debugger.watch_input("context_get")<cr>A<cr>
+  map <silent> <F12> :python debugger.watch_input("property_get", '<cword>')<cr>A<cr>
+  
+  command! -nargs=0 Up python debugger.up()
+  command! -nargs=0 Dn python debugger.down()
+  command! -nargs=? Pg python debugger.property("<args>")
+endfunction
+function! ClearFunctionKeys()
+  unmap <F1>
+  unmap <F2>
+  unmap <F3>
+  unmap <F4>
+  unmap <F7>
+  unmap <F9>
+  unmap <F11>
+  unmap <F12>
 
-map <Leader>dr :python debugger.resize()<cr>
-map <Leader>di :python debugger.command('step_into')<cr>
-map <Leader>do :python debugger.command('step_over')<cr>
-map <Leader>dt :python debugger.command('step_out')<cr>
+  delcommand Up
+  delcommand Dn
+  delcommand Pg
+endfunction
 
-nnoremap ,pe :python debugger.watch_input("eval")<cr>A
-
-map <F5> :python debugger.run()<cr>
-map <F6> :python debugger.quit()<cr>
-
-map <F7> :python debugger.command('step_into')<cr>
-map <F8> :python debugger.command('step_over')<cr>
-map <F9> :python debugger.command('step_out')<cr>
-
-map <F11> :python debugger.context('context_get')<cr>
-map <F12> :python debugger.property()<cr>
-map <F11> :python debugger.watch_input("context_get")<cr>A<cr>
-map <F12> :python debugger.watch_input("property_get", '<cword>')<cr>A<cr>
-
-hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
-hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
-function! Bae(val)
-  let g:debuggerBreakAtEntry = a:val
-  execute 'python debugger.break_at_entry = '.a:val
+function! Bae()
+  let g:debuggerBreakAtEntry = (g:debuggerBreakAtEntry == 1) ? 0 : 1
+  execute 'python debugger.break_at_entry = '.g:debuggerBreakAtEntry
 endfunction
 function! WatchWindowOnEnter()
-  execute "Pg ".substitute(getline("."),"\\s*\\(\\S*\\)\\s*=.*","\\1","g")
-  execute "normal \<c-w>p"
+  let l:line = getline(".")
+  if l:line =~ "^\\s*\\$.* = (object)\\|(array)"
+    execute "Pg ".substitute(line,"\\s*\\(\\S*\\)\\s*=.*","\\1","g")
+    execute "normal \<c-w>p"
+  elseif l:line =~ "^\\d\\+  .*:\\d\\+$"
+    let fn = substitute(l:line,"^\\d\\+  \\(.*\\):\\d\\+$","\\1","")
+    let ln = substitute(l:line,"^\\d\\+  .*:\\(\\d\\+\\)$","\\1","")
+    execute 'python debugger.debugSession.jump("'.l:fn.'",'.l:ln.')'
+  endif
 endfunction
 function! StackWindowOnEnter()
   let l:stackNo = substitute(getline("."),"\\(\\d\\+\\)\\s\\+.*","\\1","g")
@@ -128,17 +143,12 @@ function! StackWindowOnEnter()
     execute "normal \<c-w>p"
   endif
 endfunction
-autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
-autocmd BufEnter STACK_WINDOW map <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>
-command! -nargs=? Bp python debugger.mark('<args>')
-command! -nargs=0 Up python debugger.up()
-command! -nargs=0 Dn python debugger.down()
-command! -nargs=0 Bl python debugger.list()
-command! -nargs=? Pg python debugger.property("<args>")
-command! -nargs=1 Bae :call Bae('<args>')
-command! -nargs=0 Dh python debugger.ui.help()
+
+hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
+hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
+
 if !exists('g:debuggerPort')
   let g:debuggerPort = 9000
 endif
@@ -156,4 +166,8 @@ if !exists('g:debuggerBreakAtEntry')
 endif
 python debugger_init()
 set laststatus=2
+
+autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
+autocmd BufEnter STACK_WINDOW map <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>
+autocmd BufLeave HELP__WINDOW :python debugger.ui.helpwin=None
 autocmd VimLeavePre * python debugger.quit()
