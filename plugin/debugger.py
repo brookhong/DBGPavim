@@ -65,6 +65,7 @@ class VimWindow:
   def __init__(self, name = 'DEBUG_WINDOW'):
     """ initialize """
     self.name       = name
+    self.method     = "new"
     self.buffer     = None
     self.firstwrite = 1
   def isprepared(self):
@@ -75,16 +76,20 @@ class VimWindow:
   def prepare(self):
     """ check window is OK, if not then create """
     if not self.isprepared():
-      self.create()
+      self.create(self.method)
+  def before_create(self):
+    vim.command("1wincmd w")
   def on_create(self):
     pass
   def getwinnr(self):
     return int(vim.eval("bufwinnr('"+self.name+"')"))
-
   def focus(self):
     winnr = self.getwinnr()
     vim.command(str(winnr) + 'wincmd w')
-
+  def getWidth(self):
+    return int(vim.eval("winwidth(bufwinnr('"+self.name+"'))"))
+  def getHeight(self):
+    return int(vim.eval("winheight(bufwinnr('"+self.name+"'))"))
   def xml_on_element(self, node):
     line = str(node.nodeName)
     if node.hasAttributes():
@@ -122,6 +127,8 @@ class VimWindow:
     #self.window.cursor = (len(self.buffer), 1)
   def create(self, method = 'new'):
     """ create window """
+    self.method = method
+    self.before_create()
     vim.command('silent ' + method + ' ' + self.name)
     #if self.name != 'LOG___WINDOW':
     vim.command("setlocal buftype=nofile")
@@ -327,6 +334,7 @@ class WatchWindow(VimWindow):
     self.command('set noai nocin')
     self.command('set nowrap fdm=marker fmr={{{,}}} ft=php fdl=1')
   def input(self, mode, arg = ''):
+    self.prepare()
     line = self.buffer[-1]
     if line[:len(mode)+1] == '/*{{{1*/ => '+mode+':':
       self.buffer[-1] = line + arg
@@ -351,6 +359,8 @@ class WatchWindow(VimWindow):
 class HelpWindow(VimWindow):
   def __init__(self, name = 'HELP__WINDOW'):
     VimWindow.__init__(self, name)
+  def before_create(self):
+    pass
   def on_create(self):
     self.write(                                                          \
         '[ Function Keys ]                    | [ Command Mode ]             \n' + \
@@ -359,7 +369,7 @@ class HelpWindow(VimWindow):
         '  <F3>   step over                   | :Dn stack down               \n' + \
         '  <F4>   step out                    | :Bl list breakpoints         \n' + \
         '  <F5>   run                         | :Pg property get             \n' + \
-        '  <F6>   quit debugging              |                              \n' + \
+        '  <F6>   quit debugging              | <F9>   toggle layout         \n' + \
         '  <F7>   eval                        | <F11>  get all context       \n' + \
         '  <F8>   toggle debuggerBreakAtEntry | <F12>  get property at cursor\n' + \
         '                                                                    \n' + \
@@ -370,11 +380,13 @@ class HelpWindow(VimWindow):
 
 class DebugUI:
   """ DEBUGUI class """
-  def __init__(self, debug):
+  def __init__(self, debug, stackwinHeight, watchwinWidth):
     """ initialize object """
     self.debug = debug
     self.watchwin = WatchWindow()
     self.stackwin = StackWindow()
+    self.stackwinHeight = stackwinHeight
+    self.watchwinWidth = watchwinWidth
     self.helpwin  = None
     if self.debug:
       self.tracewin = TraceWindow()
@@ -438,11 +450,17 @@ class DebugUI:
     self.cursign = None
   def create(self):
     """ create windows """
-    self.stackwin.create('belowright 12 new')
-    vim.command("wincmd w")
-    self.watchwin.create('vertical belowright 60 new')
+    self.stackwin.create('botright '+str(self.stackwinHeight)+' new')
+    self.watchwin.create('vertical belowright '+str(self.watchwinWidth)+' new')
     if self.debug:
       self.tracewin.create('belowright new')
+  def reLayout(self):
+    if self.stackwin.getHeight() != self.stackwinHeight or self.watchwin.getWidth() != self.watchwinWidth:
+      self.stackwin.command("resize "+str(self.stackwinHeight))
+      self.watchwin.command("vertical resize "+str(self.watchwinWidth))
+    else:
+      vim.command("wincmd _")
+      vim.command("wincmd |")
 
   def set_highlight(self):
     """ set vim highlight of debugger sign """
@@ -624,7 +642,7 @@ class DbgSessionWithUI(DbgSession):
     self.command('step_into')
     self.command('property_get', "-n $_SERVER['REQUEST_URI']")
   def start(self):
-    debugger.updateStatusLine("--CONN")
+    debugger.updateStatusLine("-CONN")
     self.ui.debug_mode()
 
     if self.latestRes != None:
@@ -808,7 +826,6 @@ class DbgSessionWithUI(DbgSession):
       self.ui.stackwin.highlight_stack(self.curstack)
       self.ui.set_srcview(self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'])
 
-
   def watch_input(self, mode, arg = ''):
     self.ui.watchwin.input(mode, arg)
 
@@ -862,7 +879,7 @@ class DbgListener(Thread):
     self.lock = Lock()
     Thread.__init__(self)
   def start(self):
-    debugger.updateStatusLine("--LISN")
+    debugger.updateStatusLine("-LISN")
     Thread.start(self)
   def newSession(self, ss):
     if not isinstance(ss, DbgSessionWithUI):
@@ -872,7 +889,7 @@ class DbgListener(Thread):
     self.lock.acquire()
     self.session_queue.append(ss)
     c = str(len(self.session_queue))
-    debugger.updateStatusLine("--PEND"+c)
+    debugger.updateStatusLine("-PEND"+c)
     self.lock.release()
     print c+" pending connection(s) to be debug, press <F5> to continue."
   def nextSession(self):
@@ -892,7 +909,7 @@ class DbgListener(Thread):
       s.sock.close()
     self._status = self.CLOSED
     self.lock.release()
-    debugger.updateStatusLine("--CLSD")
+    debugger.updateStatusLine("-CLSD")
   def status(self):
     self.lock.acquire()
     s = self._status
@@ -966,12 +983,18 @@ class Debugger:
     self.debugSession  = DbgSession(None)
     vim.command('sign unplace *')
 
-    self.statusline = vim.eval('&statusline')
-    if self.statusline == "":
-      self.statusline="%<%f\ %h%m%r\ \[%{&ff}:%{&fenc}:%Y]\ %{getcwd()}\ %=%-10{(&expandtab)?'ExpandTab-'.&tabstop:'NoExpandTab'}\ %=%-10.(%l,%c%V%)\ %P"
+    self.normal_statusline = vim.eval('&statusline')
+    self.statusline="%<%f\ %=%-10.(%l,%c%V%)\ %P\ %=%{'PHP-'}%{(g:debuggerBreakAtEntry==1)?'bae':'bap'}"
     self.breakpt    = BreakPoint()
-    self.ui         = DebugUI(self.debug)
+    self.ui         = DebugUI(self.debug, 12, 60)
     self.mode       = 0
+
+  def updateStatusLine(self,msg):
+    sl = self.statusline+"%{'"+msg+"'}"
+    if(msg == "-CLSD"):
+      sl = self.normal_statusline
+    vim.command("let &statusline=\""+sl+"\"")
+
   def loadSettings(self):
     self.port = int(vim.eval('debuggerPort'))
     self.max_children = vim.eval('debuggerMaxChildren')
@@ -1000,7 +1023,7 @@ class Debugger:
       self.debugSession.start()
     else:
       self.ui.normal_mode()
-      debugger.updateStatusLine("--LISN")
+      debugger.updateStatusLine("-LISN")
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:
@@ -1092,10 +1115,6 @@ class Debugger:
                                   self.breakpt.getexp(bno))
         self.debugSession.bptsetlst[msgid] = bno
         self.debugSession.ack_command()
-
-  def updateStatusLine(self,msg):
-    sl = self.statusline+"%{'"+msg+"'}"
-    vim.command("let &statusline=\""+sl+"\"")
 
   def quit(self):
     self.ui.normal_mode()

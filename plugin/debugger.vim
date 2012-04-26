@@ -98,7 +98,7 @@ function! CreateFunctionKeys()
   map <silent> <F3> :python debugger.command('step_over')<cr>
   map <silent> <F4> :python debugger.command('step_out')<cr>
   map <silent> <F7> :python debugger.watch_input("eval")<cr>A
-  map <silent> <F9> :python debugger.resize()<cr>
+  map <silent> <F9> :python debugger.ui.reLayout()<cr>
   map <silent> <F11> :python debugger.watch_input("context_get")<cr>A<cr>
   map <silent> <F12> :python debugger.watch_input("property_get", '<cword>')<cr>A<cr>
   
@@ -107,18 +107,22 @@ function! CreateFunctionKeys()
   command! -nargs=? Pg python debugger.property("<args>")
 endfunction
 function! ClearFunctionKeys()
-  unmap <F1>
-  unmap <F2>
-  unmap <F3>
-  unmap <F4>
-  unmap <F7>
-  unmap <F9>
-  unmap <F11>
-  unmap <F12>
-
-  delcommand Up
-  delcommand Dn
-  delcommand Pg
+  try
+    unmap <F1>
+    unmap <F2>
+    unmap <F3>
+    unmap <F4>
+    unmap <F7>
+    unmap <F9>
+    unmap <F11>
+    unmap <F12>
+  
+    delcommand Up
+    delcommand Dn
+    delcommand Pg
+	catch /.*/
+	  echo "Exception from" v:throwpoint
+	endtry
 endfunction
 
 function! Bae()
