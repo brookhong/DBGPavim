@@ -1,4 +1,4 @@
-This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
+This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script\_id=1152.
 But most of the code, especially the debugger engine has been rewritten.
 
 
@@ -8,7 +8,7 @@ But most of the code, especially the debugger engine has been rewritten.
 So that VIM users do not need to wait for connection from apache server. No timeout things, users press F5 to start debugger engine, and uses his/her VIM normally. Debug engine won't stop users to interact with VIM. Users can press F6 to stop debugger engine anytime.
 
 ### Catch all connections from apache server.
-This is very important for a large website, especially for thoes pages who contain AJAX requests. In that case, one reload of a page may trigger dozens of http request, each of them goes to a different URL. The new debugger engine will catch all connections from apache server. Users can debugger all of them without missing anyone.
+This is very important for a large website, especially for thoes pages who contain AJAX requests. In that case, one reload of a page may trigger dozens of http request, each of them goes to a different URL. The new debugger engine will catch all connections from apache server. Users can debug all of them without missing anyone.
 
 ### Break only at breakpoints
 
@@ -36,6 +36,7 @@ In debuggin mode
     <F5>      => start debugging / run
     <F6>      => stop debugging 
     <F7>      => evalute expression and display result. cursor is automatically move to watch window. type line and just press enter. 
+    <F9>      => toggle layout
     <F11>     => shows all variables 
     <F12>     => shows variable on current cursor 
 
@@ -47,6 +48,15 @@ In debuggin mode
 
 ### Status line for debugger engine
 
+    After user press <F5> to start debugger engine, a string like "PHP-bae-LISN" will show up at the right side of status line.
+
+    The status string looks like -- 
+
+    PHP-<bae|bap>-<LISN|PENDn|CONN|CLSD>
+
+    bae       => means Break At Entry
+    bap       => means Break only At breakPoints
+
     LISN      => means the debugger engine is listening.
     PENDn     => means there are n connections waiting for debugging.
     CONN      => means debug session has been established, and being debugged.
@@ -55,23 +65,41 @@ In debuggin mode
 
 ## Usage
 
-* Make sure your vim has python(above 2.3) supported.
+* Make sure your vim has python(at least 2.3) supported, in vim with command
+
+    <pre>
+    :version
+    </pre>
+
+    In case of your VIM don't support python, download VIM source package from http://www.vim.org/download.php, then build your own VIM with commands --
+
+    <pre>
+    ./configure --prefix=/opt/vim --enable-pythoninterp --with-python-config-dir=/usr/lib/python2.4/config
+    make
+    make install
+    </pre>
 
 * Install xdebug for php, and edit php.ini
 
-    zend_extension=<path_to_xdebug.so>
-    xdebug.remote_enable=1
+    <pre>
+    zend\_extension=path\_to\_xdebug.so
+    xdebug.remote\_enable=1
+    </pre>
 
 * Edit your ~/.vimrc
 
+    <pre>
     let g:debuggerPort = 6789
     let g:debuggerBreakAtEntry = 0
+    </pre>
 
 * Edit your apche configure file
 
     In your VirtualHost section, set debugger port same as the one in your vimrc
 
-    php_value xdebug.remote_port 6789
+    <pre>
+    php\_value xdebug.remote\_port 6789
+    </pre>
 
 * Save debugger.py and debugger.vim to your ~/.vimr/plugin
 
@@ -79,6 +107,11 @@ In debuggin mode
 
 * Now, press F5 to start debugger engine
 
-* Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1. If you would like to debug from CLI, start your php script like 
+* Back to your browser, add XDEBUG\_SESSION\_START=1 to your URL, for example, http://localhost/index.php?XDEBUG\_SESSION\_START=1. If you would like to debug from CLI, start your php script like 
 
-    php -dxdebug.remote_autostart=1 -dxdebug.remote_port 6789 test.php
+    <pre>
+    php -dxdebug.remote\_autostart=1 -dxdebug.remote\_port 6789 test.php
+    </pre>
+
+## Screenshot under Windows
+![windows screenshot](http://sharing-from-brook.16002.n6.nabble.com/file/n4930670/with_help.png)

@@ -380,6 +380,7 @@ class HelpWindow(VimWindow):
 
 class DebugUI:
   """ DEBUGUI class """
+  (NORMAL, DEBUG) = (0,1)
   def __init__(self, debug, stackwinHeight, watchwinWidth):
     """ initialize object """
     self.debug = debug
@@ -390,7 +391,7 @@ class DebugUI:
     self.helpwin  = None
     if self.debug:
       self.tracewin = TraceWindow()
-    self.mode     = 0 # normal mode
+    self.mode     = DebugUI.NORMAL
     self.file     = None
     self.line     = None
     self.winbuf   = {}
@@ -402,9 +403,9 @@ class DebugUI:
 
   def debug_mode(self):
     """ change mode to debug """
-    if self.mode == 1: # is debug mode ?
+    if self.mode == DebugUI.DEBUG:
       return
-    self.mode = 1
+    self.mode = DebugUI.DEBUG
     # save session
     vim.command('mksession! ' + self.sessfile)
     for i in range(1, len(vim.windows)+1):
@@ -425,7 +426,7 @@ class DebugUI:
     vim.command('call CreateFunctionKeys()')
   def normal_mode(self):
     """ restore mode to normal """
-    if self.mode == 0: # is normal mode ?
+    if self.mode == DebugUI.NORMAL:
       return
 
     vim.command('call ClearFunctionKeys()')
@@ -446,7 +447,7 @@ class DebugUI:
     self.winbuf.clear()
     self.file    = None
     self.line    = None
-    self.mode    = 0
+    self.mode    = DebugUI.NORMAL
     self.cursign = None
   def create(self):
     """ create windows """
@@ -495,21 +496,21 @@ class DebugUI:
     if file == self.file and self.line == line:
       return
 
-    nextsign = self.next_sign()
-
     if file != self.file:
       self.file = file
       self.go_srcview()
       vim.command('silent edit ' + file)
 
-    vim.command('sign place ' + nextsign + ' name=current line='+str(line)+' file='+file)
-    vim.command('sign unplace ' + self.cursign)
-
-    vim.command('sign jump ' + nextsign + ' file='+file)
-    #vim.command('normal z.')
+    if self.mode == DebugUI.DEBUG:
+      nextsign = self.next_sign()
+      vim.command('sign place ' + nextsign + ' name=current line='+str(line)+' file='+file)
+      vim.command('sign unplace ' + self.cursign)
+      vim.command('sign jump ' + nextsign + ' file='+file)
+      self.cursign = nextsign
+    else:
+      vim.command(': ' + str(line))
 
     self.line    = line
-    self.cursign = nextsign
 
 class DbgSession:
   def __init__(self, sock):
@@ -518,6 +519,8 @@ class DbgSession:
     self.sock = sock
     self.bptsetlst  = {}
     self.bptsetids  = {}
+  def jump(self, fn, line):
+    vim.command("e +"+str(line)+" "+str(fn))
   def handle_response_breakpoint_set(self, res):
     """handle <response command=breakpoint_set> tag
     <responsponse command="breakpoint_set" id="110180001" transaction_id="1"/>"""
@@ -987,7 +990,6 @@ class Debugger:
     self.statusline="%<%f\ %=%-10.(%l,%c%V%)\ %P\ %=%{'PHP-'}%{(g:debuggerBreakAtEntry==1)?'bae':'bap'}"
     self.breakpt    = BreakPoint()
     self.ui         = DebugUI(self.debug, 12, 60)
-    self.mode       = 0
 
   def updateStatusLine(self,msg):
     sl = self.statusline+"%{'"+msg+"'}"
@@ -1001,17 +1003,6 @@ class Debugger:
     self.max_data = vim.eval('debuggerMaxData')
     self.max_depth = vim.eval('debuggerMaxDepth')
     self.break_at_entry = int(vim.eval('debuggerBreakAtEntry'))
-  def resize(self):
-    self.mode = self.mode + 1
-    if self.mode >= 3:
-      self.mode = 0
-
-    if self.mode == 0:
-      vim.command("wincmd =")
-    elif self.mode == 1:
-      vim.command("wincmd |")
-    if self.mode == 2:
-      vim.command("wincmd _")
   def handle_exception(self):
     if debugger.debug:
       self.ui.tracewin.write(sys.exc_info())
