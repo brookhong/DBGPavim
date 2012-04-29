@@ -1,4 +1,4 @@
-This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script\_id=1152.
+This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
 But most of the code, especially the debugger engine has been rewritten.
 
 
@@ -44,6 +44,19 @@ In debuggin mode
     :Up        => goto upper level of stack 
     :Dn        => goto lower level of stack 
 
+In Watch window
+
+    If you press Enter key at a line which ends with --
+    
+    (object)  => to get value of an object.
+    (array)   => to get value of an array.
+
+    If you press Enter key at a line of output from command :Bl, that breakpoint will be located.
+
+In Stack window
+
+    If you press Enter key at a line, stack level will be set.
+
 ### Windows Support
 
 ### Status line for debugger engine
@@ -82,8 +95,8 @@ In debuggin mode
 * Install xdebug for php, and edit php.ini
 
     <pre>
-    zend\_extension=path\_to\_xdebug.so
-    xdebug.remote\_enable=1
+    zend_extension=path_to_xdebug.so
+    xdebug.remote_enable=1
     </pre>
 
 * Edit your ~/.vimrc
@@ -98,7 +111,7 @@ In debuggin mode
     In your VirtualHost section, set debugger port same as the one in your vimrc
 
     <pre>
-    php\_value xdebug.remote\_port 6789
+    php_value xdebug.remote_port 6789
     </pre>
 
 * Save debugger.py and debugger.vim to your ~/.vimr/plugin
@@ -107,11 +120,8 @@ In debuggin mode
 
 * Now, press F5 to start debugger engine
 
-* Back to your browser, add XDEBUG\_SESSION\_START=1 to your URL, for example, http://localhost/index.php?XDEBUG\_SESSION\_START=1. If you would like to debug from CLI, start your php script like 
+* Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1. If you would like to debug from CLI, start your php script like 
 
     <pre>
-    php -dxdebug.remote\_autostart=1 -dxdebug.remote\_port 6789 test.php
+    php -dxdebug.remote_autostart=1 -dxdebug.remote_port 6789 test.php
     </pre>
-
-## Screenshot under Windows
-![windows screenshot](http://sharing-from-brook.16002.n6.nabble.com/file/n4930670/with_help.png)

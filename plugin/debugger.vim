@@ -90,6 +90,8 @@ endif
 map <silent> <F5> :python debugger.run()<cr>
 map <silent> <F6> :python debugger.quit()<cr>
 map <silent> <F8> :call Bae()<cr>
+map <silent> + :call ResizeWindow("+")<cr>
+map <silent> - :call ResizeWindow("-")<cr>
 command! -nargs=? Bp python debugger.mark('<args>')
 command! -nargs=0 Bl python debugger.list()
 function! CreateFunctionKeys()
@@ -105,6 +107,7 @@ function! CreateFunctionKeys()
   command! -nargs=0 Up python debugger.up()
   command! -nargs=0 Dn python debugger.down()
   command! -nargs=? Pg python debugger.property("<args>")
+  command! -nargs=0 Dt python debugger.ui.trace()
 endfunction
 function! ClearFunctionKeys()
   try
@@ -124,7 +127,14 @@ function! ClearFunctionKeys()
 	  echo "Exception from" v:throwpoint
 	endtry
 endfunction
-
+function! ResizeWindow(flag)
+  let l:width = winwidth("%")
+  if l:width == &columns
+    execute 'resize '.a:flag.'5'
+  else
+    execute 'vertical resize '.a:flag.'5'
+  endif
+endfunction
 function! Bae()
   let g:debuggerBreakAtEntry = (g:debuggerBreakAtEntry == 1) ? 0 : 1
   execute 'python debugger.break_at_entry = '.g:debuggerBreakAtEntry

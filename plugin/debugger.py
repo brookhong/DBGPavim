@@ -381,16 +381,14 @@ class HelpWindow(VimWindow):
 class DebugUI:
   """ DEBUGUI class """
   (NORMAL, DEBUG) = (0,1)
-  def __init__(self, debug, stackwinHeight, watchwinWidth):
+  def __init__(self, stackwinHeight, watchwinWidth):
     """ initialize object """
-    self.debug = debug
     self.watchwin = WatchWindow()
     self.stackwin = StackWindow()
     self.stackwinHeight = stackwinHeight
     self.watchwinWidth = watchwinWidth
+    self.tracewin  = None
     self.helpwin  = None
-    if self.debug:
-      self.tracewin = TraceWindow()
     self.mode     = DebugUI.NORMAL
     self.file     = None
     self.line     = None
@@ -400,6 +398,14 @@ class DebugUI:
       self.sessfile = "./debugger_vim_saved_session." + str(os.getpid())
     else:
       self.sessfile = "/tmp/debugger_vim_saved_session." + str(os.getpid())
+
+  def trace(self):
+    if self.tracewin:
+      self.tracewin.destroy()
+      self.tracewin = None
+    else:
+      self.tracewin = TraceWindow()
+      self.tracewin.create('belowright new')
 
   def debug_mode(self):
     """ change mode to debug """
@@ -453,8 +459,6 @@ class DebugUI:
     """ create windows """
     self.stackwin.create('botright '+str(self.stackwinHeight)+' new')
     self.watchwin.create('vertical belowright '+str(self.watchwinWidth)+' new')
-    if self.debug:
-      self.tracewin.create('belowright new')
   def reLayout(self):
     if self.stackwin.getHeight() != self.stackwinHeight or self.watchwin.getWidth() != self.watchwinWidth:
       self.stackwin.command("resize "+str(self.stackwinHeight))
@@ -481,7 +485,7 @@ class DebugUI:
     """ destroy windows """
     self.watchwin.destroy()
     self.stackwin.destroy()
-    if self.debug:
+    if self.tracewin:
       self.tracewin.destroy()
   def go_srcview(self):
     vim.command('1wincmd w')
@@ -578,8 +582,6 @@ class DbgSession:
     self.sock.send(cmd + '\0')
   def handle_recvd_msg(self, res):
     resDom = xml.dom.minidom.parseString(res)
-    if debugger.debug:
-      debugger.ui.tracewin.write(res)
     if resDom.firstChild.tagName == "response" and resDom.firstChild.getAttribute('command') == "breakpoint_set":
       self.handle_response_breakpoint_set(resDom)
     return resDom
@@ -643,7 +645,6 @@ class DbgSessionWithUI(DbgSession):
     self.command('feature_set', '-n max_data -v ' + debugger.max_data)
     self.command('feature_set', '-n max_depth -v ' + debugger.max_depth)
     self.command('step_into')
-    self.command('property_get', "-n $_SERVER['REQUEST_URI']")
   def start(self):
     debugger.updateStatusLine("-CONN")
     self.ui.debug_mode()
@@ -651,19 +652,19 @@ class DbgSessionWithUI(DbgSession):
     if self.latestRes != None:
       self.handle_recvd_msg(self.latestRes)
       self.command('stack_get')
-      self.command('property_get', "-n $_SERVER['REQUEST_URI']")
     else:
       self.init()
+    self.command('property_get', "-d %d -n $_SERVER['REQUEST_URI']" % (self.laststack))
     self.ui.go_srcview()
   def send_msg(self, cmd):
     """ send message """
     self.sock.send(cmd + '\0')
     # log message
-    if debugger.debug:
+    if self.ui.tracewin:
       self.ui.tracewin.write(str(self.msgid) + ' : send =====> ' + cmd)
   def handle_recvd_msg(self, txt):
     # log messages {{{
-    if debugger.debug:
+    if self.ui.tracewin:
       self.ui.tracewin.write( str(self.msgid) + ' : recv <===== {{{   ' + txt)
       self.ui.tracewin.write('}}}')
     res = xml.dom.minidom.parseString(txt)
@@ -694,6 +695,8 @@ class DbgSessionWithUI(DbgSession):
       return
     handler(res)
     return
+  def handle_response_stop(self, res):
+    debugger.handle_exception()
 
   def handle_init(self, res):
     """handle <init> tag
@@ -720,7 +723,7 @@ class DbgSessionWithUI(DbgSession):
 
   def handle_response_error(self, res):
     """ handle <error> tag """
-    if debugger.debug:
+    if self.ui.tracewin:
       self.ui.tracewin.write_xml_childs(res)
     errors  = res.getElementsByTagName('error')
     for error in errors:
@@ -901,6 +904,7 @@ class DbgListener(Thread):
     if len(self.session_queue) > 0:
       session = self.session_queue.pop(0)
     self.lock.release()
+    print ""
     return session
   def stop(self):
     self.lock.acquire()
@@ -980,16 +984,15 @@ class Debugger:
   """ Main Debugger class """
   def __init__(self):
     """ initialize Debugger """
-    self.debug = 0
     self.loadSettings()
     self.debugListener = DbgListener(self.port)
     self.debugSession  = DbgSession(None)
     vim.command('sign unplace *')
 
     self.normal_statusline = vim.eval('&statusline')
-    self.statusline="%<%f\ %=%-10.(%l,%c%V%)\ %P\ %=%{'PHP-'}%{(g:debuggerBreakAtEntry==1)?'bae':'bap'}"
+    self.statusline="%<%f\ %h%m%r\ %=%-10.(%l,%c%V%)\ %P\ %=%{'PHP-'}%{(g:debuggerBreakAtEntry==1)?'bae':'bap'}"
     self.breakpt    = BreakPoint()
-    self.ui         = DebugUI(self.debug, 12, 60)
+    self.ui         = DebugUI(12, 70)
 
   def updateStatusLine(self,msg):
     sl = self.statusline+"%{'"+msg+"'}"
@@ -1004,7 +1007,7 @@ class Debugger:
     self.max_depth = vim.eval('debuggerMaxDepth')
     self.break_at_entry = int(vim.eval('debuggerBreakAtEntry'))
   def handle_exception(self):
-    if debugger.debug:
+    if self.ui.tracewin:
       self.ui.tracewin.write(sys.exc_info())
       self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
     self.debugSession.close()
@@ -1072,6 +1075,8 @@ class Debugger:
         self.debugSession.command('run')
         if self.debugSession.status != 'stopping':
           self.debugSession.command('stack_get')
+        else:
+          self.debugSession.command("stop")
       else:
         session = self.debugListener.nextSession()
         if session != None:
