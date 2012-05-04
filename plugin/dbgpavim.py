@@ -30,25 +30,7 @@
 #    Brook Hong <hzgmaxwell <at> hotmail.com>
 #    The plugin was originally writen by --
 #    Seung Woo Shin <segv <at> sayclub.com>
-#    Sam Ghods <sam <at> box.net>
 #    I rewrote it with a new debugger engine, please diff this file to find code change.
-
-"""
-    debugger.py -- DBGp client: a remote debugger interface to DBGp protocol
-
-    Usage:
-        Use with the debugger.vim vim plugin
-
-    This debugger is designed to be used with debugger.vim,
-    a vim plugin which provides a full debugging environment
-    right inside vim.
-
-    CHECK DEBUGGER.VIM FOR THE FULL DOCUMENTATION.
-
-    Example usage:
-        Place inside <source vim directory>/plugin/ along with
-        debugger.py.
-"""
 
 import os
 import sys
@@ -58,6 +40,8 @@ import base64
 import traceback
 import xml.dom.minidom
 
+import string
+import time
 from threading import Thread,Lock
 
 class VimWindow:
@@ -506,6 +490,8 @@ class DebugUI:
       vim.command('silent edit ' + file)
 
     if self.mode == DebugUI.DEBUG:
+      if line == 0:
+        line = 1
       nextsign = self.next_sign()
       vim.command('sign place ' + nextsign + ' name=current line='+str(line)+' file='+file)
       vim.command('sign unplace ' + self.cursign)
@@ -640,20 +626,21 @@ class DbgSessionWithUI(DbgSession):
     self.bptsetlst  = ss.bptsetlst
     self.bptsetids  = ss.bptsetids
   def init(self):
-    DbgSession.init(self)
     self.command('feature_set', '-n max_children -v ' + debugger.max_children)
     self.command('feature_set', '-n max_data -v ' + debugger.max_data)
     self.command('feature_set', '-n max_depth -v ' + debugger.max_depth)
-    self.command('step_into')
   def start(self):
     debugger.updateStatusLine("-CONN")
     self.ui.debug_mode()
 
     if self.latestRes != None:
       self.handle_recvd_msg(self.latestRes)
+      self.init()
       self.command('stack_get')
     else:
+      DbgSession.init(self)
       self.init()
+      self.command('step_into')
     self.command('property_get', "-d %d -n $_SERVER['REQUEST_URI']" % (self.laststack))
     self.ui.go_srcview()
   def send_msg(self, cmd):
@@ -885,8 +872,12 @@ class DbgListener(Thread):
     self.lock = Lock()
     Thread.__init__(self)
   def start(self):
-    debugger.updateStatusLine("-LISN")
     Thread.start(self)
+    time.sleep(0.1)
+    self.lock.acquire()
+    if self._status == self.LISTEN:
+      debugger.updateStatusLine("-LISN")
+    self.lock.release()
   def newSession(self, ss):
     if not isinstance(ss, DbgSessionWithUI):
       s = DbgSessionWithUI(None)
@@ -924,11 +915,19 @@ class DbgListener(Thread):
     return s
   def run(self):
     global debugger
+    self.lock.acquire()
     serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    serv.bind(('', self.port))
+    try:
+      serv.bind(('', self.port))
+    except socket.error, e:
+      print "Can not bind to port "+str(self.port)+', Socket Error '+str(e[0])
+      self.lock.release()
+      return
+    print ""
     serv.listen(5)
     self._status = self.LISTEN
+    self.lock.release()
     while 1:
       (sock, address) = serv.accept()
       s = self.status()
@@ -1006,6 +1005,18 @@ class Debugger:
     self.max_data = vim.eval('debuggerMaxData')
     self.max_depth = vim.eval('debuggerMaxDepth')
     self.break_at_entry = int(vim.eval('debuggerBreakAtEntry'))
+  def setMaxChildren(self):
+    self.max_children = vim.eval('debuggerMaxChildren')
+    if self.debugSession.sock != None:
+      self.debugSession.command('feature_set', '-n max_children -v ' + self.max_children)
+  def setMaxDepth(self):
+    self.max_depth = vim.eval('debuggerMaxDepth')
+    if self.debugSession.sock != None:
+      self.debugSession.command('feature_set', '-n max_depth -v ' + self.max_depth)
+  def setMaxData(self):
+    self.max_data = vim.eval('debuggerMaxData')
+    if self.debugSession.sock != None:
+      self.debugSession.command('feature_set', '-n max_data -v ' + self.max_data)
   def handle_exception(self):
     if self.ui.tracewin:
       self.ui.tracewin.write(sys.exc_info())
@@ -1043,6 +1054,9 @@ class Debugger:
       if self.debugSession.sock == None:
         print 'No debug session started.'
       else:
+        string.replace(name,'"','\'')
+        if string.find(name,' ') != -1:
+          name = "\"" + name +"\""
         self.debugSession.property_get(name)
     except:
       self.handle_exception()

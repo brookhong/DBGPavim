@@ -1,5 +1,5 @@
 " vim: tabstop=2 shiftwidth=2 softtabstop=2 expandtab
-" DBGp client: a remote debugger interface to the DBGp protocol
+" DBGPavim: a remote debugger interface to the DBGp protocol
 "
 " Script Info and Documentation  {{{
 "=============================================================================
@@ -24,14 +24,12 @@
 "				CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 "				TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 "				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-" Name Of File: debugger.vim, debugger.py
+" Name Of File: dbgpavim.vim, dbgpavim.py
 "  Description: remote debugger interface to DBGp protocol
-"               The DBGPavim originates from http://www.vim.org/scripts/script.php?script_id=1152 and http://www.vim.org/scripts/script.php?script_id=1929, with a new enhanced debugger engine.
- 
-"   Maintainer: hzgmaxwell <at> hotmail <dot> com
+"               The DBGPavim originates from http://www.vim.org/scripts/script.php?script_id=1152, with a new enhanced debugger engine.
 "
 "               This file should reside in the plugins directory along
-"               with debugger.py and be automatically sourced.
+"               with dbgpavim.py and be automatically sourced.
 "               
 "               By default, the script expects the debugging engine to connect
 "               on port 9000. You can change this with the g:debuggerPort
@@ -45,7 +43,7 @@
 "               There are three maximum limits you can set referring to the
 "               properties (variables) returned by the debugging engine.
 "
-"               g:debuggerMaxChildren (default 32): The max number of array or
+"               g:debuggerMaxChildren (default 1024): The max number of array or
 "               object children to initially retrieve per variable.
 "               For example:
 "
@@ -71,20 +69,22 @@
 "
 "                 let g:debuggerBreakAtEntry = 0
 "
+"               To enable debug from CLI
+"
+"                 php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9000 test.php
 "=============================================================================
 " }}}
-" php -dxdebug.remote_autostart=1 test.php
 " Do not source this script when python is not compiled in.
 if !has("python")
     finish
 endif
 
-" Load debugger.py either from the same path where debugger.vim is
-let s:debugger_py = expand("<sfile>:p:h")."/debugger.py"
-if filereadable(s:debugger_py)
-  exec 'pyfile '.s:debugger_py
+" Load dbgpavim.py either from the same path where dbgpavim.vim is
+let s:dbgpavim_py = expand("<sfile>:p:h")."/dbgpavim.py"
+if filereadable(s:dbgpavim_py)
+  exec 'pyfile '.s:dbgpavim_py 
 else
-  call confirm('debugger.vim: Unable to find '.s:debugger_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
+  call confirm('dbgpavim.vim: Unable to find '.s:dbgpavim_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
 endif
 
 map <silent> <F5> :python debugger.run()<cr>
@@ -94,6 +94,9 @@ map <silent> + :call ResizeWindow("+")<cr>
 map <silent> - :call ResizeWindow("-")<cr>
 command! -nargs=? Bp python debugger.mark('<args>')
 command! -nargs=0 Bl python debugger.list()
+command! -nargs=1 Dmc let g:debuggerMaxChildren=<args>|python debugger.setMaxChildren()
+command! -nargs=1 Dme let g:debuggerMaxDepth=<args>|python debugger.setMaxDepth()
+command! -nargs=1 Dma let g:debuggerMaxData=<args>|python debugger.setMaxData()
 function! CreateFunctionKeys()
   map <silent> <F1> :python debugger.ui.help()<cr>
   map <silent> <F2> :python debugger.command('step_into')<cr>
@@ -142,7 +145,7 @@ endfunction
 function! WatchWindowOnEnter()
   let l:line = getline(".")
   if l:line =~ "^\\s*\\$.* = (object)\\|(array)"
-    execute "Pg ".substitute(line,"\\s*\\(\\S*\\)\\s*=.*","\\1","g")
+    execute "Pg ".substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")
     execute "normal \<c-w>p"
   elseif l:line =~ "^\\d\\+  .*:\\d\\+$"
     let fn = substitute(l:line,"^\\d\\+  \\(.*\\):\\d\\+$","\\1","")
@@ -167,7 +170,7 @@ if !exists('g:debuggerPort')
   let g:debuggerPort = 9000
 endif
 if !exists('g:debuggerMaxChildren')
-  let g:debuggerMaxChildren = 32
+  let g:debuggerMaxChildren = 1024
 endif
 if !exists('g:debuggerMaxData')
   let g:debuggerMaxData = 1024
