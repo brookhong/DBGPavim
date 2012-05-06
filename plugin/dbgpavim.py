@@ -630,7 +630,7 @@ class DbgSessionWithUI(DbgSession):
     self.command('feature_set', '-n max_data -v ' + debugger.max_data)
     self.command('feature_set', '-n max_depth -v ' + debugger.max_depth)
   def start(self):
-    debugger.updateStatusLine("-CONN")
+    debugger.updateStatusLine()
     self.ui.debug_mode()
 
     if self.latestRes != None:
@@ -874,10 +874,12 @@ class DbgListener(Thread):
   def start(self):
     Thread.start(self)
     time.sleep(0.1)
+    debugger.updateStatusLine()
+  def pendingCount(self):
     self.lock.acquire()
-    if self._status == self.LISTEN:
-      debugger.updateStatusLine("-LISN")
+    c = len(self.session_queue)
     self.lock.release()
+    return c
   def newSession(self, ss):
     if not isinstance(ss, DbgSessionWithUI):
       s = DbgSessionWithUI(None)
@@ -886,8 +888,8 @@ class DbgListener(Thread):
     self.lock.acquire()
     self.session_queue.append(ss)
     c = str(len(self.session_queue))
-    debugger.updateStatusLine("-PEND"+c)
     self.lock.release()
+    debugger.updateStatusLine()
     print c+" pending connection(s) to be debug, press <F5> to continue."
   def nextSession(self):
     session = None
@@ -907,7 +909,7 @@ class DbgListener(Thread):
       s.sock.close()
     self._status = self.CLOSED
     self.lock.release()
-    debugger.updateStatusLine("-CLSD")
+    debugger.updateStatusLine()
   def status(self):
     self.lock.acquire()
     s = self._status
@@ -993,10 +995,18 @@ class Debugger:
     self.breakpt    = BreakPoint()
     self.ui         = DebugUI(12, 70)
 
-  def updateStatusLine(self,msg):
-    sl = self.statusline+"%{'"+msg+"'}"
-    if(msg == "-CLSD"):
+  def updateStatusLine(self):
+    status = self.debugListener.status()
+    if status == DbgListener.INIT or status == DbgListener.CLOSED:
       sl = self.normal_statusline
+    else:
+      c = self.debugListener.pendingCount()
+      if c > 0:
+        sl = self.statusline+"%{'-PEND"+str(c)+"'}"
+      elif self.debugSession.sock != None:
+        sl = self.statusline+"%{'-CONN'}"
+      else:
+        sl = self.statusline+"%{'-LISN'}"
     vim.command("let &statusline=\""+sl+"\"")
 
   def loadSettings(self):
@@ -1028,7 +1038,7 @@ class Debugger:
       self.debugSession.start()
     else:
       self.ui.normal_mode()
-      debugger.updateStatusLine("-LISN")
+      debugger.updateStatusLine()
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:
@@ -1077,6 +1087,7 @@ class Debugger:
         self.debugSession.down()
     except:
       self.handle_exception()
+
   def run(self):
     """ start debugger or continue """
     try:
@@ -1087,10 +1098,10 @@ class Debugger:
         self.debugListener.start()
       elif self.debugSession.sock != None:
         self.debugSession.command('run')
-        if self.debugSession.status != 'stopping':
-          self.debugSession.command('stack_get')
-        else:
+        if self.debugSession.status == 'stopping':
           self.debugSession.command("stop")
+        elif self.debugSession.status != 'stopped':
+          self.debugSession.command("stack_get")
       else:
         session = self.debugListener.nextSession()
         if session != None:
