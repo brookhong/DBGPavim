@@ -233,13 +233,6 @@ class StackWindow(VimWindow):
     self.command('syntax clear')
     self.command('syntax region CurStack start="^' +str(no)+ ' " end="$"')
 
-class LogWindow(VimWindow):
-  def __init__(self, name = 'LOG___WINDOW'):
-    VimWindow.__init__(self, name)
-  def on_create(self):
-    self.command('set nowrap fdm=marker fmr={{{,}}} fdl=0')
-    self.write('asdfasdf')
-
 class TraceWindow(VimWindow):
   def __init__(self, name = 'TRACE_WINDOW'):
     VimWindow.__init__(self, name)
@@ -316,7 +309,7 @@ class WatchWindow(VimWindow):
     self.write('<?')
     self.command('inoremap <buffer> <cr> <esc>:python debugger.debugSession.watch_execute()<cr>')
     self.command('set noai nocin')
-    self.command('set nowrap fdm=marker fmr={{{,}}} ft=php fdl=1')
+    self.command('set nowrap fdm=manual fmr={{{,}}} ft=php fdl=1')
   def input(self, mode, arg = ''):
     self.prepare()
     line = self.buffer[-1]
@@ -553,23 +546,19 @@ class DbgSession:
       body = body + buf
     return body
   def recv_msg(self):
-    try:
-      length = self.recv_length()
-      body   = self.recv_body(length)
-      self.recv_null()
-      return body
-    except socket.error, e:
-      # WINDOWS come here
-      if e[0] == 10053:
-        raise EOFError, 'Socket Closed'
-      else:
-        raise EOFError, 'Socket Error '+str(e[0])
+    length = self.recv_length()
+    body   = self.recv_body(length)
+    self.recv_null()
+    return body
   def send_msg(self, cmd):
     self.sock.send(cmd + '\0')
   def handle_recvd_msg(self, res):
     resDom = xml.dom.minidom.parseString(res)
-    if resDom.firstChild.tagName == "response" and resDom.firstChild.getAttribute('command') == "breakpoint_set":
-      self.handle_response_breakpoint_set(resDom)
+    if resDom.firstChild.tagName == "response":
+      if resDom.firstChild.getAttribute('command') == "breakpoint_set":
+        self.handle_response_breakpoint_set(resDom)
+      if resDom.firstChild.getAttribute('command') == "stop":
+        self.close()
     return resDom
   def send_command(self, cmd, arg1 = '', arg2 = ''):
     self.msgid = self.msgid + 1
@@ -598,6 +587,8 @@ class DbgSession:
       self.sock.close()
       self.sock = None
   def init(self):
+    if self.latestRes != None:
+      return
     self.ack_command(1)
     flag = 0
     for bno in debugger.breakpt.list():
@@ -630,6 +621,7 @@ class DbgSessionWithUI(DbgSession):
     self.command('feature_set', '-n max_data -v ' + debugger.max_data)
     self.command('feature_set', '-n max_depth -v ' + debugger.max_depth)
   def start(self):
+    self.sock.settimeout(30)
     debugger.updateStatusLine()
     self.ui.debug_mode()
 
@@ -847,11 +839,12 @@ class DbgSessionWithUI(DbgSession):
       print "no commands", cmd, expr
 
 class DbgSilentClient(Thread):
-  def __init__(self, sock):
-    self.session = DbgSession(sock)
+  def __init__(self, ss):
+    self.session = ss
     Thread.__init__(self)
   def run(self):
     self.session.init()
+    self.session.sock.settimeout(None)
 
     resDom = self.session.command("run")
     status = "stopping"
@@ -897,6 +890,7 @@ class DbgListener(Thread):
     if len(self.session_queue) > 0:
       session = self.session_queue.pop(0)
     self.lock.release()
+    debugger.updateStatusLine()
     print ""
     return session
   def stop(self):
@@ -937,7 +931,7 @@ class DbgListener(Thread):
         if debugger.break_at_entry:
           self.newSession(DbgSessionWithUI(sock))
         else:
-          client = DbgSilentClient(sock)
+          client = DbgSilentClient(DbgSession(sock))
           client.start()
       else:
         break
@@ -1031,14 +1025,27 @@ class Debugger:
     if self.ui.tracewin:
       self.ui.tracewin.write(sys.exc_info())
       self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
-    self.debugSession.close()
+    errno = sys.exc_info()[0]
+
     session = self.debugListener.nextSession()
-    if session != None:
-      self.debugSession = session
-      self.debugSession.start()
-    else:
-      self.ui.normal_mode()
-      debugger.updateStatusLine()
+    if errno == socket.timeout:
+      if session != None:
+        print "socket timeout, switch to another session."
+        ss = DbgSession(self.debugSession.sock)
+        ss.latestRes = self.debugSession.latestRes
+        client = DbgSilentClient(ss)
+        client.start()
+        self.debugSession = session
+        self.debugSession.start()
+      else:
+        print "socket timeout, try again or press F6 to stop debugging."
+    else: #errno == socket.error:
+      self.debugSession.close()
+      if session != None:
+        self.debugSession = session
+        self.debugSession.start()
+      else:
+        self.ui.normal_mode()
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:
@@ -1056,6 +1063,8 @@ class Debugger:
       else:
         if arg == '<cword>':
           arg = vim.eval('expand("<cword>")')
+        if arg == 'this':
+          arg = '$this'
         self.debugSession.watch_input(cmd, arg)
     except:
       self.handle_exception()
@@ -1067,6 +1076,8 @@ class Debugger:
         string.replace(name,'"','\'')
         if string.find(name,' ') != -1:
           name = "\"" + name +"\""
+        elif name == 'this':
+          name = '$this'
         self.debugSession.property_get(name)
     except:
       self.handle_exception()
