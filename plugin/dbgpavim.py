@@ -1046,6 +1046,7 @@ class Debugger:
         self.debugSession.start()
       else:
         self.ui.normal_mode()
+    self.updateStatusLine()
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:

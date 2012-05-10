@@ -1,31 +1,38 @@
 This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
-But most of the code, especially the debugger engine has been rewritten.
+But most of the code, especially the debugger backend has been rewritten.
 
+Tested with -- 
+* XDebug 2.2 - PHP 5.4 - GVIM 7.3 - Python 2.7 @ Windows 7 
+* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux 
+* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux 
+* XDebug 2.2 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux 
+
+Some screenshots (under Windows 7) are here at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
 
 ## The enhancements are --
 
-### Non blocking debugger engine.
-So that VIM users do not need to wait for connection from apache server. No timeout things, users press F5 to start debugger engine, and uses his/her VIM normally. Debug engine won't stop users to interact with VIM. Users can press F6 to stop debugger engine anytime.
+### Non blocking debugger backend.
+So that VIM users do not need to wait for connection from apache server. No timeout things, users press F5 to start debugger backend, and uses his/her VIM normally. Debug backend won't stop users to interact with VIM. Users can press F6 to stop debugger backend anytime.
 
 ### Catch all connections from apache server.
-This is very important for a large website, especially for thoes pages who contain AJAX requests. In that case, one reload of a page may trigger dozens of http request, each of them goes to a different URL. The new debugger engine will catch all connections from apache server. Users can debug all of them without missing anyone.
+This is very important for a large website, especially for thoes pages who contain AJAX requests. In that case, one reload of a page may trigger dozens of http request, each of them goes to a different URL. The new debugger backend will catch all connections from apache server. Users can debug all of them without missing anyone.
 
 ### Break only at breakpoints
 
     let g:debuggerBreakAtEntry = 0
 
-    The setting will cause debugger engine to break only at breakpoints. Default value is 1, which means it works like before, the debugger engine breaks at entry.
+    The setting will cause debugger backend to break only at breakpoints. Default value is 1, which means it works like before, the debugger backend breaks at entry.
 
 ### new commands and function keys
 
 In normal mode
 
-    <F5>      => start debugger engine
-    <F6>      => stop debugger engine
-    <F8>      => toggle debuggerBreakAtEntry, when g:debuggerBreakAtEntry=0, debugger engine breaks only at breakpoints.
+    <F5>      => start debugger backend
+    <F6>      => stop debugger backend
+    <F8>      => toggle debuggerBreakAtEntry, when g:debuggerBreakAtEntry=0, debugger backend breaks only at breakpoints.
 
-    Bl        => to list all breakpoints
-    Bp        => toggle breakpoint on current line
+    :Bl        => to list all breakpoints
+    :Bp        => toggle breakpoint on current line
 
 In debuggin mode 
 
@@ -59,9 +66,9 @@ In Stack window
 
 ### Windows Support
 
-### Status line for debugger engine
+### Status line for debugger backend
 
-    After user press <F5> to start debugger engine, a string like "PHP-bae-LISN" will show up at the right side of status line.
+    After user press <F5> to start debugger backend, a string like "PHP-bae-LISN" will show up at the right side of status line.
 
     The status string looks like -- 
 
@@ -70,11 +77,12 @@ In Stack window
     bae       => means Break At Entry
     bap       => means Break only At breakPoints
 
-    LISN      => means the debugger engine is listening.
+    LISN      => means the debugger backend is listening.
     PENDn     => means there are n connections waiting for debugging.
     CONN      => means debug session has been established, and being debugged.
-    CLSD      => means the debugger engine has stopped.
+    CLSD      => means the debugger backend has stopped.
 
+### New layout of windows
 
 ## Usage
 
@@ -102,7 +110,7 @@ In Stack window
 * Edit your ~/.vimrc
 
     <pre>
-    let g:debuggerPort = 6789
+    let g:debuggerPort = 9009
     let g:debuggerBreakAtEntry = 0
     </pre>
 
@@ -111,17 +119,19 @@ In Stack window
     In your VirtualHost section, set debugger port same as the one in your vimrc
 
     <pre>
-    php_value xdebug.remote_port 6789
+    php_value xdebug.remote_port 9009
     </pre>
 
-* Save debugger.py and debugger.vim to your ~/.vimr/plugin
+* Save debugger.py and debugger.vim to your ~/.vim/plugin
 
 * Open your php file, use :Bp to set breakpoints
 
-* Now, press F5 to start debugger engine
+* Now, press F5 to start debugger backend
 
 * Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1. If you would like to debug from CLI, start your php script like 
 
     <pre>
-    php -dxdebug.remote_autostart=1 -dxdebug.remote_port 6789 test.php
+    php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009 test.php
     </pre>
+
+If you are tied of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox with help of GreaseMonkey.
