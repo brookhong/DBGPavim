@@ -307,7 +307,7 @@ class WatchWindow(VimWindow):
       return str(node.data)
   def on_create(self):
     self.write('<?')
-    self.command('inoremap <buffer> <cr> <esc>:python debugger.debugSession.watch_execute()<cr>')
+    self.command('inoremap <buffer> <cr> <esc>:python dbgPavim.debugSession.watch_execute()<cr>')
     self.command('set noai nocin')
     self.command('set nowrap fdm=manual fmr={{{,}}} ft=php fdl=1')
   def input(self, mode, arg = ''):
@@ -591,10 +591,10 @@ class DbgSession:
       return
     self.ack_command(1)
     flag = 0
-    for bno in debugger.breakpt.list():
+    for bno in dbgPavim.breakpt.list():
       msgid = self.send_command('breakpoint_set', \
-                                '-t line -f ' + debugger.breakpt.getfile(bno) + ' -n ' + str(debugger.breakpt.getline(bno)) + ' -s enabled', \
-                                debugger.breakpt.getexp(bno))
+                                '-t line -f ' + dbgPavim.breakpt.getfile(bno) + ' -n ' + str(dbgPavim.breakpt.getline(bno)) + ' -s enabled', \
+                                dbgPavim.breakpt.getexp(bno))
       self.bptsetlst[msgid] = bno
       flag = 1
     if flag:
@@ -603,7 +603,7 @@ class DbgSession:
 class DbgSessionWithUI(DbgSession):
   def __init__(self, sock):
     self.status     = None
-    self.ui         = debugger.ui
+    self.ui         = dbgPavim.ui
 
     self.msgid      = 0
     self.stacks     = []
@@ -617,12 +617,12 @@ class DbgSessionWithUI(DbgSession):
     self.bptsetlst  = ss.bptsetlst
     self.bptsetids  = ss.bptsetids
   def init(self):
-    self.command('feature_set', '-n max_children -v ' + debugger.max_children)
-    self.command('feature_set', '-n max_data -v ' + debugger.max_data)
-    self.command('feature_set', '-n max_depth -v ' + debugger.max_depth)
+    self.command('feature_set', '-n max_children -v ' + dbgPavim.max_children)
+    self.command('feature_set', '-n max_data -v ' + dbgPavim.max_data)
+    self.command('feature_set', '-n max_depth -v ' + dbgPavim.max_depth)
   def start(self):
     self.sock.settimeout(30)
-    debugger.updateStatusLine()
+    dbgPavim.updateStatusLine()
     self.ui.debug_mode()
 
     if self.latestRes != None:
@@ -653,7 +653,7 @@ class DbgSessionWithUI(DbgSession):
       handler = getattr(self, 'handle_' + fc.tagName)
       handler(res)
     except AttributeError:
-      print 'Debugger.handle_'+fc.tagName+'() not found, please see the LOG___WINDOW'
+      print 'DBGPavim.handle_'+fc.tagName+'() not found, please see the LOG___WINDOW'
     self.ui.go_srcview()
     return res
   def handle_response(self, res):
@@ -670,12 +670,12 @@ class DbgSessionWithUI(DbgSession):
     try:
       handler = getattr(self, 'handle_response_' + command)
     except AttributeError:
-      print 'Debugger.handle_response_'+command+'() not found, please see the LOG___WINDOW'
+      print 'DBGPavim.handle_response_'+command+'() not found, please see the LOG___WINDOW'
       return
     handler(res)
     return
   def handle_response_stop(self, res):
-    debugger.handle_exception()
+    dbgPavim.handle_exception()
 
   def handle_init(self, res):
     """handle <init> tag
@@ -853,7 +853,7 @@ class DbgSilentClient(Thread):
     if status == "stopping":
       self.session.command("stop")
     elif status == "break":
-      debugger.debugListener.newSession(self.session)
+      dbgPavim.debugListener.newSession(self.session)
 
 class DbgListener(Thread):
   (INIT,LISTEN,CLOSED) = (0,1,2)
@@ -867,7 +867,7 @@ class DbgListener(Thread):
   def start(self):
     Thread.start(self)
     time.sleep(0.1)
-    debugger.updateStatusLine()
+    dbgPavim.updateStatusLine()
   def pendingCount(self):
     self.lock.acquire()
     c = len(self.session_queue)
@@ -882,7 +882,7 @@ class DbgListener(Thread):
     self.session_queue.append(ss)
     c = str(len(self.session_queue))
     self.lock.release()
-    debugger.updateStatusLine()
+    dbgPavim.updateStatusLine()
     print c+" pending connection(s) to be debug, press <F5> to continue."
   def nextSession(self):
     session = None
@@ -890,7 +890,7 @@ class DbgListener(Thread):
     if len(self.session_queue) > 0:
       session = self.session_queue.pop(0)
     self.lock.release()
-    debugger.updateStatusLine()
+    dbgPavim.updateStatusLine()
     print ""
     return session
   def stop(self):
@@ -903,17 +903,18 @@ class DbgListener(Thread):
       s.sock.close()
     self._status = self.CLOSED
     self.lock.release()
-    debugger.updateStatusLine()
+    dbgPavim.updateStatusLine()
   def status(self):
     self.lock.acquire()
     s = self._status
     self.lock.release()
     return s
   def run(self):
-    global debugger
+    global dbgPavim
     self.lock.acquire()
     serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    serv.settimeout(None)
     try:
       serv.bind(('', self.port))
     except socket.error, e:
@@ -928,7 +929,7 @@ class DbgListener(Thread):
       (sock, address) = serv.accept()
       s = self.status()
       if s == self.LISTEN:
-        if debugger.break_at_entry:
+        if dbgPavim.break_at_entry:
           self.newSession(DbgSessionWithUI(sock))
         else:
           client = DbgSilentClient(DbgSession(sock))
@@ -975,10 +976,10 @@ class BreakPoint:
     """ return list of breakpoint number """
     return self.dictionaries.keys()
 
-class Debugger:
-  """ Main Debugger class """
+class DBGPavim:
+  """ Main DBGPavim class """
   def __init__(self):
-    """ initialize Debugger """
+    """ initialize DBGPavim """
     self.loadSettings()
     self.debugListener = DbgListener(self.port)
     self.debugSession  = DbgSession(None)
@@ -1155,8 +1156,8 @@ class Debugger:
     self.debugListener.stop()
 
 def debugger_init():
-  global debugger
-  debugger = Debugger()
+  global dbgPavim
+  dbgPavim = DBGPavim()
 
 error_msg = { \
     # 000 Command parsing errors

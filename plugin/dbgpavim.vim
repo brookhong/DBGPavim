@@ -87,30 +87,30 @@ else
   call confirm('dbgpavim.vim: Unable to find '.s:dbgpavim_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
 endif
 
-map <silent> <F5> :python debugger.run()<cr>
-map <silent> <F6> :python debugger.quit()<cr>
+map <silent> <F5> :python dbgPavim.run()<cr>
+map <silent> <F6> :python dbgPavim.quit()<cr>
 map <silent> <F8> :call Bae()<cr>
 map <silent> + :call ResizeWindow("+")<cr>
 map <silent> - :call ResizeWindow("-")<cr>
-command! -nargs=? Bp python debugger.mark('<args>')
-command! -nargs=0 Bl python debugger.list()
-command! -nargs=1 Dmc let g:debuggerMaxChildren=<args>|python debugger.setMaxChildren()
-command! -nargs=1 Dme let g:debuggerMaxDepth=<args>|python debugger.setMaxDepth()
-command! -nargs=1 Dma let g:debuggerMaxData=<args>|python debugger.setMaxData()
+command! -nargs=? Bp python dbgPavim.mark('<args>')
+command! -nargs=0 Bl python dbgPavim.list()
+command! -nargs=1 Dmc let g:debuggerMaxChildren=<args>|python dbgPavim.setMaxChildren()
+command! -nargs=1 Dme let g:debuggerMaxDepth=<args>|python dbgPavim.setMaxDepth()
+command! -nargs=1 Dma let g:debuggerMaxData=<args>|python dbgPavim.setMaxData()
 function! CreateFunctionKeys()
-  map <silent> <F1> :python debugger.ui.help()<cr>
-  map <silent> <F2> :python debugger.command('step_into')<cr>
-  map <silent> <F3> :python debugger.command('step_over')<cr>
-  map <silent> <F4> :python debugger.command('step_out')<cr>
-  map <silent> <F7> :python debugger.watch_input("eval")<cr>A
-  map <silent> <F9> :python debugger.ui.reLayout()<cr>
-  map <silent> <F11> :python debugger.watch_input("context_get")<cr>A<cr>
-  map <silent> <F12> :python debugger.watch_input("property_get", '<cword>')<cr>A<cr>
+  map <silent> <F1> :python dbgPavim.ui.help()<cr>
+  map <silent> <F2> :python dbgPavim.command('step_into')<cr>
+  map <silent> <F3> :python dbgPavim.command('step_over')<cr>
+  map <silent> <F4> :python dbgPavim.command('step_out')<cr>
+  map <silent> <F7> :python dbgPavim.watch_input("eval")<cr>A
+  map <silent> <F9> :python dbgPavim.ui.reLayout()<cr>
+  map <silent> <F11> :python dbgPavim.watch_input("context_get")<cr>A<cr>
+  map <silent> <F12> :python dbgPavim.watch_input("property_get", '<cword>')<cr>A<cr>
   
-  command! -nargs=0 Up python debugger.up()
-  command! -nargs=0 Dn python debugger.down()
-  command! -nargs=? Pg python debugger.property("<args>")
-  command! -nargs=0 Dt python debugger.ui.trace()
+  command! -nargs=0 Up python dbgPavim.up()
+  command! -nargs=0 Dn python dbgPavim.down()
+  command! -nargs=? Pg python dbgPavim.property("<args>")
+  command! -nargs=0 Dt python dbgPavim.ui.trace()
 endfunction
 function! ClearFunctionKeys()
   try
@@ -140,7 +140,7 @@ function! ResizeWindow(flag)
 endfunction
 function! Bae()
   let g:debuggerBreakAtEntry = (g:debuggerBreakAtEntry == 1) ? 0 : 1
-  execute 'python debugger.break_at_entry = '.g:debuggerBreakAtEntry
+  execute 'python dbgPavim.break_at_entry = '.g:debuggerBreakAtEntry
 endfunction
 function! WatchWindowOnEnter()
   let l:line = getline(".")
@@ -150,13 +150,13 @@ function! WatchWindowOnEnter()
   elseif l:line =~ "^\\d\\+  .*:\\d\\+$"
     let fn = substitute(l:line,"^\\d\\+  \\(.*\\):\\d\\+$","\\1","")
     let ln = substitute(l:line,"^\\d\\+  .*:\\(\\d\\+\\)$","\\1","")
-    execute 'python debugger.debugSession.jump("'.l:fn.'",'.l:ln.')'
+    execute 'python dbgPavim.debugSession.jump("'.l:fn.'",'.l:ln.')'
   endif
 endfunction
 function! StackWindowOnEnter()
   let l:stackNo = substitute(getline("."),"\\(\\d\\+\\)\\s\\+.*","\\1","g")
   if l:stackNo =~ "^\\d\\+$" 
-    execute 'python debugger.debugSession.go('.l:stackNo.')'
+    execute 'python dbgPavim.debugSession.go('.l:stackNo.')'
     execute "normal \<c-w>p"
   endif
 endfunction
@@ -186,5 +186,5 @@ set laststatus=2
 
 autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
 autocmd BufEnter STACK_WINDOW map <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>
-autocmd BufLeave HELP__WINDOW :python debugger.ui.helpwin=None
-autocmd VimLeavePre * python debugger.quit()
+autocmd BufLeave HELP__WINDOW :python dbgPavim.ui.helpwin=None
+autocmd VimLeavePre * python dbgPavim.quit()
