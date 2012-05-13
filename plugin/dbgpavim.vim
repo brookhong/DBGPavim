@@ -32,10 +32,10 @@
 "               with dbgpavim.py and be automatically sourced.
 "               
 "               By default, the script expects the debugging engine to connect
-"               on port 9000. You can change this with the g:debuggerPort
+"               on port 9000. You can change this with the g:dbgPavimPort
 "               variable by putting the following line your vimrc:
 "
-"                 let g:debuggerPort = 10001
+"                 let g:dbgPavimPort = 10001
 "
 "               where 10001 is the new port number you want the server to
 "               connect to.
@@ -43,31 +43,37 @@
 "               There are three maximum limits you can set referring to the
 "               properties (variables) returned by the debugging engine.
 "
-"               g:debuggerMaxChildren (default 1024): The max number of array or
+"               g:dbgPavimMaxChildren (default 1024): The max number of array or
 "               object children to initially retrieve per variable.
 "               For example:
 "
-"                 let g:debuggerMaxChildren = 64
+"                 let g:dbgPavimMaxChildren = 64
 "
-"               g:debuggerMaxData (default 1024 bytes): The max amount of
+"               g:dbgPavimMaxData (default 1024 bytes): The max amount of
 "               variable data to retrieve.
 "               For example:
 "
-"                 let g:debuggerMaxData = 2048
+"                 let g:dbgPavimMaxData = 2048
 "
-"               g:debuggerMaxDepth (default 1): The maximum depth that the
+"               g:dbgPavimMaxDepth (default 1): The maximum depth that the
 "               debugger engine may return when sending arrays, hashs or
 "               object structures to the IDE.
 "               For example:
 "
-"                 let g:debuggerMaxDepth = 10
+"                 let g:dbgPavimMaxDepth = 10
 "
-"               g:debuggerBreakAtEntry (default 1): Whether to break at entry,
+"               g:dbgPavimBreakAtEntry (default 1): Whether to break at entry,
 "               if set it 0, the debugger engine will break only at
 "               breakpoints.
 "               For example:
 "
-"                 let g:debuggerBreakAtEntry = 0
+"                 let g:dbgPavimBreakAtEntry = 0
+"
+"               g:dbgPavimPathMap (default []): Map local path to remote path
+"               on server.
+"               For example:
+"
+"                 let g:dbgPavimPathMap = [['D:/works/php','/var/www'],]
 "
 "               To enable debug from CLI
 "
@@ -94,9 +100,9 @@ map <silent> + :call ResizeWindow("+")<cr>
 map <silent> - :call ResizeWindow("-")<cr>
 command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
-command! -nargs=1 Dmc let g:debuggerMaxChildren=<args>|python dbgPavim.setMaxChildren()
-command! -nargs=1 Dme let g:debuggerMaxDepth=<args>|python dbgPavim.setMaxDepth()
-command! -nargs=1 Dma let g:debuggerMaxData=<args>|python dbgPavim.setMaxData()
+command! -nargs=1 Dmc let g:dbgPavimMaxChildren=<args>|python dbgPavim.setMaxChildren()
+command! -nargs=1 Dme let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()
+command! -nargs=1 Dma let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
 function! CreateFunctionKeys()
   map <silent> <F1> :python dbgPavim.ui.help()<cr>
   map <silent> <F2> :python dbgPavim.command('step_into')<cr>
@@ -139,8 +145,8 @@ function! ResizeWindow(flag)
   endif
 endfunction
 function! Bae()
-  let g:debuggerBreakAtEntry = (g:debuggerBreakAtEntry == 1) ? 0 : 1
-  execute 'python dbgPavim.break_at_entry = '.g:debuggerBreakAtEntry
+  let g:dbgPavimBreakAtEntry = (g:dbgPavimBreakAtEntry == 1) ? 0 : 1
+  execute 'python dbgPavim.break_at_entry = '.g:dbgPavimBreakAtEntry
 endfunction
 function! WatchWindowOnEnter()
   let l:line = getline(".")
@@ -166,22 +172,25 @@ hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
 
-if !exists('g:debuggerPort')
-  let g:debuggerPort = 9000
+if !exists('g:dbgPavimPort')
+  let g:dbgPavimPort = 9000
 endif
-if !exists('g:debuggerMaxChildren')
-  let g:debuggerMaxChildren = 1024
+if !exists('g:dbgPavimMaxChildren')
+  let g:dbgPavimMaxChildren = 1024
 endif
-if !exists('g:debuggerMaxData')
-  let g:debuggerMaxData = 1024
+if !exists('g:dbgPavimMaxData')
+  let g:dbgPavimMaxData = 1024
 endif
-if !exists('g:debuggerMaxDepth')
-  let g:debuggerMaxDepth = 1
+if !exists('g:dbgPavimMaxDepth')
+  let g:dbgPavimMaxDepth = 1
 endif
-if !exists('g:debuggerBreakAtEntry')
-  let g:debuggerBreakAtEntry = 1
+if !exists('g:dbgPavimBreakAtEntry')
+  let g:dbgPavimBreakAtEntry = 1
 endif
-python debugger_init()
+if !exists('g:dbgPavimPathMap')
+  let g:dbgPavimPathMap = []
+endif 
+python dbgPavim_init()
 set laststatus=2
 
 autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>

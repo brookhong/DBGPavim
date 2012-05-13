@@ -19,7 +19,7 @@ This is very important for a large website, especially for thoes pages who conta
 
 ### Break only at breakpoints
 
-    let g:debuggerBreakAtEntry = 0
+    let g:dbgPavimBreakAtEntry = 0
 
     The setting will cause debugger backend to break only at breakpoints. Default value is 1, which means it works like before, the debugger backend breaks at entry.
 
@@ -29,7 +29,7 @@ In normal mode
 
     <F5>      => start debugger backend
     <F6>      => stop debugger backend
-    <F8>      => toggle debuggerBreakAtEntry, when g:debuggerBreakAtEntry=0, debugger backend breaks only at breakpoints.
+    <F8>      => toggle dbgPavimBreakAtEntry, when g:dbgPavimBreakAtEntry=0, debugger backend breaks only at breakpoints.
 
     :Bl        => to list all breakpoints
     :Bp        => toggle breakpoint on current line
@@ -110,8 +110,8 @@ In Stack window
 * Edit your ~/.vimrc
 
     <pre>
-    let g:debuggerPort = 9009
-    let g:debuggerBreakAtEntry = 0
+    let g:dbgPavimPort = 9009
+    let g:dbgPavimBreakAtEntry = 0
     </pre>
 
 * Edit your apche configure file
@@ -122,7 +122,7 @@ In Stack window
     php_value xdebug.remote_port 9009
     </pre>
 
-* Save debugger.py and debugger.vim to your ~/.vim/plugin
+* Save dbgpavim.py and dbgpavim.vim to your ~/.vim/plugin
 
 * Open your php file, use :Bp to set breakpoints
 
