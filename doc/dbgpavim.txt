@@ -1,4 +1,4 @@
-This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
+*DBGPavim* is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
 But most of the code, especially the debugger backend has been rewritten.
 
 Tested with -- 
@@ -9,7 +9,7 @@ Tested with --
 
 Some screenshots (under Windows 7) are here at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
 
-## The enhancements are --
+## The *enhancements* are --
 
 ### Non blocking debugger backend.
 So that VIM users do not need to wait for connection from apache server. No timeout things, users press F5 to start debugger backend, and uses his/her VIM normally. Debug backend won't stop users to interact with VIM. Users can press F6 to stop debugger backend anytime.
@@ -23,7 +23,7 @@ This is very important for a large website, especially for thoes pages who conta
 
     The setting will cause debugger backend to break only at breakpoints. Default value is 1, which means it works like before, the debugger backend breaks at entry.
 
-### new commands and function keys
+### New *commands* and function keys
 
 In normal mode
 
@@ -66,7 +66,7 @@ In Stack window
 
 ### Windows Support
 
-### Status line for debugger backend
+### *Status* line for debugger backend
 
     After user press <F5> to start debugger backend, a string like "PHP-bae-LISN" will show up at the right side of status line.
 
@@ -88,53 +88,39 @@ In Stack window
 
     In case that you need run VIM on a different machine from server where apache httpd runs, configuration for DBGPavim --
 
-    <pre>
     let g:dbgPavimPathMap = [['D:/works/php','/var/www'],]
-    </pre>
 
     Some change for Apache configuration is also necessary --
 
-    <pre>
     php_value xdebug.remote_host <ip_address_where_you_run_vim>
-    </pre>
 
-## Usage
+## *Usage*
 
 * Make sure your vim has python(at least 2.3) supported, in vim with command
 
-    <pre>
     :version
-    </pre>
 
     In case of your VIM don't support python, download VIM source package from http://www.vim.org/download.php, then build your own VIM with commands --
 
-    <pre>
     ./configure --prefix=/opt/vim --enable-pythoninterp --with-python-config-dir=/usr/lib/python2.4/config
     make
     make install
-    </pre>
 
 * Install xdebug for php, and edit php.ini
 
-    <pre>
     zend_extension=path_to_xdebug.so
     xdebug.remote_enable=1
-    </pre>
 
 * Edit your ~/.vimrc
 
-    <pre>
     let g:dbgPavimPort = 9009
     let g:dbgPavimBreakAtEntry = 0
-    </pre>
 
 * Edit your apche configure file
 
     In your VirtualHost section, set debugger port same as the one in your vimrc
 
-    <pre>
     php_value xdebug.remote_port 9009
-    </pre>
 
 * Save dbgpavim.py and dbgpavim.vim to your ~/.vim/plugin
 
@@ -144,8 +130,8 @@ In Stack window
 
 * Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1. If you would like to debug from CLI, start your php script like 
 
-    <pre>
     php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009 test.php
-    </pre>
 
 If you are tied of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox with help of GreaseMonkey.
+
+For more instructions, latest version and bug reports, please go to https://github.com/brookhong/DBGPavim.

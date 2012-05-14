@@ -621,6 +621,7 @@ class DbgSessionWithUI(DbgSession):
   def copyFromParent(self, ss):
     self.latestRes = ss.latestRes
     self.msgid = ss.msgid
+    self.isWinServer = ss.isWinServer
     self.sock = ss.sock
     self.bptsetlst  = ss.bptsetlst
     self.bptsetids  = ss.bptsetids
@@ -1172,7 +1173,7 @@ class DBGPavim:
       vim.command('sign place ' + str(bno) + ' name=breakpt line=' + str(row) + ' file=' + file)
       if self.debugSession.sock != None:
         fn = dbgPavim.remotePathOf(self.breakpt.getfile(bno))
-        if self.isWinServer:
+        if self.debugSession.isWinServer:
           fn = fn.replace("/","\\")
         msgid = self.debugSession.send_command('breakpoint_set', \
                                   '-t line -f ' + fn + ' -n ' + str(self.breakpt.getline(bno)), \
