@@ -62,12 +62,12 @@
 "
 "                 let g:dbgPavimMaxDepth = 10
 "
-"               g:dbgPavimBreakAtEntry (default 1): Whether to break at entry,
+"               g:dbgPavimBreakAtEntry (default 0): Whether to break at entry,
 "               if set it 0, the debugger engine will break only at
 "               breakpoints.
 "               For example:
 "
-"                 let g:dbgPavimBreakAtEntry = 0
+"                 let g:dbgPavimBreakAtEntry = 1
 "
 "               g:dbgPavimPathMap (default []): Map local path to remote path
 "               on server.
@@ -112,7 +112,8 @@ function! CreateFunctionKeys()
   map <silent> <F9> :python dbgPavim.ui.reLayout()<cr>
   map <silent> <F11> :python dbgPavim.watch_input("context_get")<cr>A<cr>
   map <silent> <F12> :python dbgPavim.watch_input("property_get", '<cword>')<cr>A<cr>
-  
+  map U u2<C-o>z.
+
   command! -nargs=0 Up python dbgPavim.up()
   command! -nargs=0 Dn python dbgPavim.down()
   command! -nargs=? Pg python dbgPavim.property("<args>")
@@ -128,13 +129,14 @@ function! ClearFunctionKeys()
     unmap <F9>
     unmap <F11>
     unmap <F12>
-  
+    unmap U
+
     delcommand Up
     delcommand Dn
     delcommand Pg
-	catch /.*/
-	  echo "Exception from" v:throwpoint
-	endtry
+  catch /.*/
+    echo "Exception from" v:throwpoint
+  endtry
 endfunction
 function! ResizeWindow(flag)
   let l:width = winwidth("%")
@@ -150,13 +152,15 @@ function! Bae()
 endfunction
 function! WatchWindowOnEnter()
   let l:line = getline(".")
-  if l:line =~ "^\\s*\\$.* = (object)\\|(array)"
+  if l:line =~ "^\\s*\\$.* = (object) $\\|(array) $"
     execute "Pg ".substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")
     execute "normal \<c-w>p"
   elseif l:line =~ "^\\d\\+  .*:\\d\\+$"
     let fn = substitute(l:line,"^\\d\\+  \\(.*\\):\\d\\+$","\\1","")
     let ln = substitute(l:line,"^\\d\\+  .*:\\(\\d\\+\\)$","\\1","")
     execute 'python dbgPavim.debugSession.jump("'.l:fn.'",'.l:ln.')'
+  elseif foldlevel(".") > 0
+    execute 'normal za'
   endif
 endfunction
 function! StackWindowOnEnter()
@@ -185,7 +189,7 @@ if !exists('g:dbgPavimMaxDepth')
   let g:dbgPavimMaxDepth = 1
 endif
 if !exists('g:dbgPavimBreakAtEntry')
-  let g:dbgPavimBreakAtEntry = 1
+  let g:dbgPavimBreakAtEntry = 0
 endif
 if !exists('g:dbgPavimPathMap')
   let g:dbgPavimPathMap = []

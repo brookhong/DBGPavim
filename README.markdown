@@ -19,9 +19,8 @@ This is very important for a large website, especially for thoes pages who conta
 
 ### Break only at breakpoints
 
-    let g:dbgPavimBreakAtEntry = 0
-
-    The setting will cause debugger backend to break only at breakpoints. Default value is 1, which means it works like before, the debugger backend breaks at entry.
+    Now the debugger backend breaks only at breakpoints by default, if you would like the debugger backend to break at entry, then add below line to your vimrc --
+    let g:dbgPavimBreakAtEntry = 1
 
 ### new commands and function keys
 
@@ -54,7 +53,7 @@ In debuggin mode
 In Watch window
 
     If you press Enter key at a line which ends with --
-    
+
     (object)  => to get value of an object.
     (array)   => to get value of an array.
 
@@ -88,15 +87,11 @@ In Stack window
 
     In case that you need run VIM on a different machine from server where apache httpd runs, configuration for DBGPavim --
 
-    <pre>
     let g:dbgPavimPathMap = [['D:/works/php','/var/www'],]
-    </pre>
 
     Some change for Apache configuration is also necessary --
 
-    <pre>
     php_value xdebug.remote_host <ip_address_where_you_run_vim>
-    </pre>
 
 ## Usage
 
@@ -149,3 +144,11 @@ In Stack window
     </pre>
 
 If you are tied of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox with help of GreaseMonkey.
+
+Or modify your apache configuration(httpd.conf) --
+
+  <VirtualHost>
+      ...
+      php_value xdebug.remote_port 9009
+      php_value xdebug.remote_autostart 1
+  </VirtualHost>
