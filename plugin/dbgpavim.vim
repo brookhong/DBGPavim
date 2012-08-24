@@ -100,9 +100,9 @@ map <silent> + :call ResizeWindow("+")<cr>
 map <silent> - :call ResizeWindow("-")<cr>
 command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
-command! -nargs=1 Dmc let g:dbgPavimMaxChildren=<args>|python dbgPavim.setMaxChildren()
-command! -nargs=1 Dme let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()
-command! -nargs=1 Dma let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
+command! -nargs=1 Children let g:dbgPavimMaxChildren=<args>|python dbgPavim.setMaxChildren()
+command! -nargs=1 Depth let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()
+command! -nargs=1 Length let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
 function! CreateFunctionKeys()
   map <silent> <F1> :python dbgPavim.ui.help()<cr>
   map <silent> <F2> :python dbgPavim.command('step_into')<cr>

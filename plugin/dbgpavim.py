@@ -250,7 +250,7 @@ class TraceWindow(VimWindow):
         desc = ' : '+error_msg[int(node.getAttribute('code'))]
       return VimWindow.xml_on_element(self, node) + desc
   def on_create(self):
-    self.command('set nowrap fdm=marker fmr={{{,}}} fdl=0')
+    self.command('set wrap fdm=marker fmr={{{,}}} fdl=0')
 
 class WatchWindow(VimWindow):
   def __init__(self, name = 'WATCH_WINDOW'):
@@ -314,7 +314,7 @@ class WatchWindow(VimWindow):
     self.write('<?')
     self.command('inoremap <buffer> <cr> <esc>:python dbgPavim.debugSession.watch_execute()<cr>')
     self.command('set noai nocin')
-    self.command('set nowrap fdm=manual fmr={{{,}}} ft=php fdl=1')
+    self.command('set wrap fdm=manual fmr={{{,}}} ft=php fdl=1')
   def input(self, mode, arg = ''):
     self.prepare()
     line = self.buffer[-1]
@@ -424,7 +424,7 @@ class DebugUI:
     # restore session
     vim.command('silent tabonly')
     vim.command('source ' + self.sessfile)
-    os.system('rm -f ' + self.sessfile)
+    os.remove(self.sessfile)
 
     self.set_highlight()
 
