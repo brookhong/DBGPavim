@@ -93,6 +93,24 @@ else
   call confirm('dbgpavim.vim: Unable to find '.s:dbgpavim_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
 endif
 
+if !exists('g:dbgPavimPort')
+  let g:dbgPavimPort = 9000
+endif
+if !exists('g:dbgPavimMaxChildren')
+  let g:dbgPavimMaxChildren = 1024
+endif
+if !exists('g:dbgPavimMaxData')
+  let g:dbgPavimMaxData = 1024
+endif
+if !exists('g:dbgPavimMaxDepth')
+  let g:dbgPavimMaxDepth = 1
+endif
+if !exists('g:dbgPavimBreakAtEntry')
+  let g:dbgPavimBreakAtEntry = 0
+endif
+if !exists('g:dbgPavimPathMap')
+  let g:dbgPavimPathMap = []
+endif
 map <silent> <F5> :python dbgPavim.run()<cr>
 map <silent> <F6> :python dbgPavim.quit()<cr>
 map <silent> <F8> :call Bae()<cr>
@@ -100,9 +118,11 @@ map <silent> + :call ResizeWindow("+")<cr>
 map <silent> - :call ResizeWindow("-")<cr>
 command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
+command! -nargs=? Dp python dbgPavim.cli('<args>')
 command! -nargs=1 Children let g:dbgPavimMaxChildren=<args>|python dbgPavim.setMaxChildren()
 command! -nargs=1 Depth let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()
 command! -nargs=1 Length let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
+
 function! CreateFunctionKeys()
   map <silent> <F1> :python dbgPavim.ui.help()<cr>
   map <silent> <F2> :python dbgPavim.command('step_into')<cr>
@@ -176,24 +196,6 @@ hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
 
-if !exists('g:dbgPavimPort')
-  let g:dbgPavimPort = 9000
-endif
-if !exists('g:dbgPavimMaxChildren')
-  let g:dbgPavimMaxChildren = 1024
-endif
-if !exists('g:dbgPavimMaxData')
-  let g:dbgPavimMaxData = 1024
-endif
-if !exists('g:dbgPavimMaxDepth')
-  let g:dbgPavimMaxDepth = 1
-endif
-if !exists('g:dbgPavimBreakAtEntry')
-  let g:dbgPavimBreakAtEntry = 0
-endif
-if !exists('g:dbgPavimPathMap')
-  let g:dbgPavimPathMap = []
-endif 
 python dbgPavim_init()
 set laststatus=2
 
