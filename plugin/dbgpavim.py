@@ -438,14 +438,11 @@ class DebugUI:
 
     self.set_highlight()
 
-
     self.winbuf.clear()
     self.file    = None
     self.line    = None
     self.mode    = DebugUI.NORMAL
     self.cursign = None
-    if self.cliwin:
-      os.remove(self.clilog)
     self.cliwin  = None
   def create(self):
     """ create windows """
@@ -920,6 +917,8 @@ class DbgListener(Thread):
     self.lock.release()
     dbgPavim.updateStatusLine()
     print c+" pending connection(s) to be debug, press <F5> to continue."
+    if dbgPavim.ui.cliwin:
+      dbgPavim.run()
   def nextSession(self):
     session = None
     self.lock.acquire()
@@ -1019,7 +1018,9 @@ class AsyncRunner(Thread):
     Thread.__init__(self)
   def run(self):
     log = open(self.logfile, "w")
-    subprocess.call(self.cmd, stdin=None, stdout=log, stderr=log, shell=True)
+    subprocess.check_call(self.cmd, stdin=None, stdout=log, stderr=log, shell=True)
+    log.close()
+    os.remove(self.logfile)
 
 class DBGPavim:
   """ Main DBGPavim class """
