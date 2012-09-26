@@ -9,20 +9,6 @@ Tested with --
 
 Some screenshots (under Windows 7) are here at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
 
-DBGPavim is both a DBGP protocol server and VIM debugger backend, it can help to debug Python code.
-I haved tried it with --
-* Komodo Python Remote Debugging Client --Python 2.7 - MacVim 7.3 @ Mac OS X 10.8
-
-1. Download Komodo Python Remote Debugging Client from http://code.activestate.com/komodo/remotedebugging/, for Mac, it's Komodo-PythonRemoteDebugging-7.1.2-73175-macosx-x86.tar.gz (Refer to http://docs.activestate.com/komodo/4.4/debugpython.html)
-
-2. Open the python script file with VIM, and Press <F5> to listen.
-
-3. extract the package, and run
-
-    bin/pydbgp -d 127.0.0.1:9000 /works/scriptbundle/python/playpen.py
-
-4. then the others are same as php debugging.
-
 ## The enhancements are --
 
 ### Non blocking debugger backend.
@@ -36,7 +22,7 @@ This is very important for a large website, especially for thoes pages who conta
     Now the debugger backend breaks only at breakpoints by default, if you would like the debugger backend to break at entry, then add below line to your vimrc --
     let g:dbgPavimBreakAtEntry = 1
 
-### new commands and function keys
+### New commands and function keys
 
 In normal mode
 
@@ -46,8 +32,9 @@ In normal mode
 
     :Bl        => to list all breakpoints
     :Bp        => toggle breakpoint on current line
+    :Dp [args] => to debug current file from CLI, it will run 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port=<your_port> <curret_file_in_vim> [args]'
 
-In debuggin mode 
+In debugging mode 
 
     <F1>      => toggle help window
     <F2>      => step into 
@@ -151,18 +138,45 @@ In Stack window
 
 * Now, press F5 to start debugger backend
 
-* Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1. If you would like to debug from CLI, start your php script like 
-
-    <pre>
-    php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009 test.php
-    </pre>
+* Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1.
 
 If you are tied of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox with help of GreaseMonkey.
 
 Or modify your apache configuration(httpd.conf) --
 
+  <pre>
   <VirtualHost>
       ...
       php_value xdebug.remote_port 9009
       php_value xdebug.remote_autostart 1
   </VirtualHost>
+  </pre>
+
+## CLI debugging
+
+* If you would like to debug from CLI, start your php script like 
+
+    <pre>
+    php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009 test.php
+    </pre>
+
+* There is new command :Dp to debug current file. :Dp command is to launch current file with
+
+    <pre>
+    php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009
+    </pre>
+
+## Python debugging
+DBGPavim is both a DBGP protocol server and VIM debugger backend, it can help to debug Python code.
+I haved tried it with --
+* Komodo Python Remote Debugging Client --Python 2.7 - MacVim 7.3 @ Mac OS X 10.8
+
+1. Download Komodo Python Remote Debugging Client from http://code.activestate.com/komodo/remotedebugging/, for Mac, it's Komodo-PythonRemoteDebugging-7.1.2-73175-macosx-x86.tar.gz (Refer to http://docs.activestate.com/komodo/4.4/debugpython.html)
+
+2. Open the python script file with VIM, and Press <F5> to listen.
+
+3. extract the package, and run
+
+    bin/pydbgp -d 127.0.0.1:9000 /works/scriptbundle/python/playpen.py
+
+4. then the others are same as php debugging.
