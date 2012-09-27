@@ -191,6 +191,33 @@ function! StackWindowOnEnter()
   endif
 endfunction
 
+function! CheckPydbgp()
+  let l:ret = 0
+  let l:pydbgp = expand('`pydbgp -h`')
+  if l:pydbgp == ''
+    echo "Please install Komodo Python Remote Debugging Client."
+    let l:ret = 1
+  endif
+  return l:ret
+endfunction
+
+function! CheckXdebug()
+  let l:ret = 0
+  let l:phpinfo = expand('`php -r "phpinfo();"`')
+  let l:port = matchstr(l:phpinfo, 'xdebug.remote_port => \d\+')
+  let l:handler = matchstr(l:phpinfo, 'xdebug.remote_handler => \a\+')
+  let l:enable = matchstr(l:phpinfo, 'xdebug.remote_enable => \a\+')
+  if l:handler !='xdebug.remote_handler => dbgp'
+    echo l:handler.' inconsistent with dbgp'
+    let l:ret = 1
+  endif
+  if l:enable !='xdebug.remote_enable => On'
+    echo l:enable.' inconsistent with On'
+    let l:ret = 1
+  endif
+  return l:ret
+endfunction
+
 hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
 hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent

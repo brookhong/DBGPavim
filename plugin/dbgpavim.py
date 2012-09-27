@@ -930,15 +930,19 @@ class DbgListener(Thread):
     return session
   def stop(self):
     self.lock.acquire()
-    if self._status == self.LISTEN:
-      client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
-      client.connect ( ( '127.0.0.1', self.port ) )
-      client.close()
-    for s in self.session_queue:
-      s.sock.close()
-    self._status = self.CLOSED
-    self.lock.release()
-    dbgPavim.updateStatusLine()
+    try:
+      if self._status == self.LISTEN:
+        client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
+        client.connect ( ( '127.0.0.1', self.port ) )
+        client.close()
+      for s in self.session_queue:
+        s.send_command('detach')
+        s.sock.close()
+      del self.session_queue[:]
+    finally:
+      self._status = self.CLOSED
+      self.lock.release()
+      dbgPavim.updateStatusLine()
   def status(self):
     self.lock.acquire()
     s = self._status
@@ -1118,6 +1122,8 @@ class DBGPavim:
         self.debugSession.command(msg, arg1, arg2)
         if self.debugSession.status != 'stopping':
           self.debugSession.command('stack_get')
+        else:
+          self.debugSession.command('stop')
     except:
       self.handle_exception()
   def watch_input(self, cmd, arg = ''):
@@ -1186,11 +1192,20 @@ class DBGPavim:
       self.handle_exception()
 
   def cli(self, args):
+    vim.command("let g:dbgPavimBreakAtEntry=1")
     self.ui.cliwin = ConsoleWindow(self.ui.clilog)
     self.run()
-    cmd = 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port='+str(self.port)+' '+vim.eval('expand("%")')+' '+args
-    ar = AsyncRunner(cmd, self.ui.clilog)
-    ar.start()
+    filetype = vim.eval('&filetype')
+    cmd = ' '+vim.eval('expand("%")')+' '+args
+    if filetype == 'php':
+      if vim.eval('CheckXdebug()') == '0':
+        cmd = 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port='+str(self.port)+cmd
+    elif filetype == 'python':
+      if vim.eval('CheckPydbgp()') == '0':
+        cmd = 'pydbgp -u -d '+str(self.port)+cmd
+    if cmd[0] != ' ':
+      ar = AsyncRunner(cmd, self.ui.clilog)
+      ar.start()
 
   def list(self):
     self.ui.watchwin.write('--> breakpoints list: ')
@@ -1223,6 +1238,8 @@ class DBGPavim:
         self.debugSession.ack_command()
 
   def quit(self):
+    if self.debugSession.sock:
+      self.debugSession.send_command('detach')
     self.ui.normal_mode()
     self.debugSession.close()
     self.debugListener.stop()
