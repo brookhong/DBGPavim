@@ -203,7 +203,7 @@ endfunction
 
 function! CheckXdebug()
   let l:ret = 0
-  let l:phpinfo = expand('`php -r "phpinfo();"`')
+  let l:phpinfo = system('php -r "phpinfo();"')
   let l:port = matchstr(l:phpinfo, 'xdebug.remote_port => \d\+')
   let l:handler = matchstr(l:phpinfo, 'xdebug.remote_handler => \a\+')
   let l:enable = matchstr(l:phpinfo, 'xdebug.remote_enable => \a\+')

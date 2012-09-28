@@ -917,8 +917,6 @@ class DbgListener(Thread):
     self.lock.release()
     dbgPavim.updateStatusLine()
     print c+" pending connection(s) to be debug, press <F5> to continue."
-    if dbgPavim.ui.cliwin:
-      dbgPavim.run()
   def nextSession(self):
     session = None
     self.lock.acquire()
@@ -1196,16 +1194,24 @@ class DBGPavim:
     self.ui.cliwin = ConsoleWindow(self.ui.clilog)
     self.run()
     filetype = vim.eval('&filetype')
-    cmd = ' '+vim.eval('expand("%")')+' '+args
-    if filetype == 'php':
-      if vim.eval('CheckXdebug()') == '0':
-        cmd = 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port='+str(self.port)+cmd
-    elif filetype == 'python':
-      if vim.eval('CheckPydbgp()') == '0':
-        cmd = 'pydbgp -u -d '+str(self.port)+cmd
-    if cmd[0] != ' ':
-      ar = AsyncRunner(cmd, self.ui.clilog)
-      ar.start()
+    filename = vim.eval('expand("%")')
+    if filename:
+      cmd = ' '+filename+' '+args
+      if filetype == 'php':
+        if vim.eval('CheckXdebug()') == '0':
+          cmd = 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port='+str(self.port)+cmd
+      elif filetype == 'python':
+        if vim.eval('CheckPydbgp()') == '0':
+          cmd = 'pydbgp -u -d '+str(self.port)+cmd
+      if cmd[0] != ' ':
+        ar = AsyncRunner(cmd, self.ui.clilog)
+        ar.start()
+        time.sleep(0.4)
+        vim.eval('feedkeys("\<f5>")')
+      else:
+        print "Only python and php file debugging are integrated for now."
+    else:
+      print "You need open one python or php file first."
 
   def list(self):
     self.ui.watchwin.write('--> breakpoints list: ')
