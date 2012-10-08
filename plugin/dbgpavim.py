@@ -387,6 +387,7 @@ class DebugUI:
     self.sessfile       = os.getenv("HOME").replace("\\","/")+"/dbgpavim_saved_session." + str(os.getpid())
     self.clilog         = os.getenv("HOME").replace("\\","/")+"/dbgpavim_cli." + str(os.getpid())
     self.cliwin         = None
+    self.backup_ssop    = vim.eval('&ssop')
 
   def trace(self):
     if self.tracewin:
@@ -402,6 +403,7 @@ class DebugUI:
       return
     self.mode = DebugUI.DEBUG
     # save session
+    vim.command('set ssop-=tabpages')
     vim.command('mksession! ' + self.sessfile)
     for i in range(1, len(vim.windows)+1):
       vim.command(str(i)+'wincmd w')
@@ -432,8 +434,8 @@ class DebugUI:
     self.destroy()
 
     # restore session
-    vim.command('silent tabonly')
     vim.command('source ' + self.sessfile)
+    vim.command("let &ssop=\""+self.backup_ssop+"\"")
     os.remove(self.sessfile)
 
     self.set_highlight()
