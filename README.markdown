@@ -2,10 +2,10 @@ This is a plugin to enable php debug in VIM with Xdebug, which originates from h
 But most of the code, especially the debugger backend has been rewritten.
 
 Tested with --
-* XDebug 2.2 - PHP 5.4 - GVIM 7.3 - Python 2.7 @ Windows 7 
-* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux 
-* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux 
-* XDebug 2.2 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux 
+* XDebug 2.2 - PHP 5.4 - GVIM 7.3 - Python 2.7 @ Windows 7
+* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
+* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux
+* XDebug 2.2 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
 
 Some screenshots (under Windows 7) are here at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
 
@@ -34,22 +34,34 @@ In normal mode
     :Bp        => toggle breakpoint on current line
     :Dp [args] => to debug current file from CLI, it will run 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port=<your_port> <curret_file_in_vim> [args]'
 
-In debugging mode 
+In debugging mode
 
     <F1>      => toggle help window
-    <F2>      => step into 
-    <F3>      => step over 
-    <F4>      => step out 
+    <F2>      => step into
+    <F3>      => step over
+    <F4>      => step out
     <F5>      => start debugging / run
-    <F6>      => stop debugging 
-    <F7>      => evalute expression and display result. cursor is automatically move to watch window. type line and just press enter. 
+    <F6>      => stop debugging
+    <F7>      => evalute expression and display result. cursor is automatically move to watch window. type line and just press enter.
     <F9>      => toggle layout
-    <F11>     => shows all variables 
-    <F12>     => shows variable on current cursor 
+    <F11>     => shows all variables
+    <F12>     => shows variable on current cursor
+
+You can define your own key mappings as blow --
+
+    let g:dbgPavimKeyRun = '<F8>'
+    let g:dbgPavimKeyStepOver = '<F10>'
+    let g:dbgPavimKeyStepInto = '<F11>'
+    let g:dbgPavimKeyStepOut = '<F12>'
+    let g:dbgPavimKeyPropertyGet = '<F3>'
+    let g:dbgPavimKeyContextGet = '<F4>'
+    let g:dbgPavimKeyToggleBp = '<F9>'
+    let g:dbgPavimKeyToggleBae = '<F5>'
+    let g:dbgPavimKeyRelayout = '<F2>'
 
     :Pg        => to print value of complex variables like $this->savings[3]
-    :Up        => goto upper level of stack 
-    :Dn        => goto lower level of stack 
+    :Up        => goto upper level of stack
+    :Dn        => goto lower level of stack
 
 In Watch window
 
@@ -70,7 +82,7 @@ In Stack window
 
     After user press <F5> to start debugger backend, a string like "PHP-bae-LISN" will show up at the right side of status line.
 
-    The status string looks like -- 
+    The status string looks like --
 
     PHP-<bae|bap>-<LISN|PENDn|CONN|CLSD>
 
@@ -154,7 +166,7 @@ Or modify your apache configuration(httpd.conf) --
 
 ## CLI debugging
 
-* If you would like to debug from CLI, start your php script like 
+* If you would like to debug from CLI, start your php script like
 
     <pre>
     php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009 test.php

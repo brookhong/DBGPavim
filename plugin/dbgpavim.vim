@@ -111,9 +111,46 @@ endif
 if !exists('g:dbgPavimPathMap')
   let g:dbgPavimPathMap = []
 endif
-map <silent> <F5> :python dbgPavim.run()<cr>
-map <silent> <F6> :python dbgPavim.quit()<cr>
-map <silent> <F8> :call Bae()<cr>
+if !exists('g:dbgPavimKeyRun')
+  let g:dbgPavimKeyRun = '<F5>'
+endif
+if !exists('g:dbgPavimKeyQuit')
+  let g:dbgPavimKeyQuit = '<F6>'
+endif
+if !exists('g:dbgPavimKeyToggleBae')
+  let g:dbgPavimKeyToggleBae = '<F8>'
+endif
+if !exists('g:dbgPavimKeyToggleBp')
+  let g:dbgPavimKeyToggleBp = '<F10>'
+endif
+if !exists('g:dbgPavimKeyHelp')
+  let g:dbgPavimKeyHelp = '<F1>'
+endif
+if !exists('g:dbgPavimKeyStepInto')
+  let g:dbgPavimKeyStepInto = '<F2>'
+endif
+if !exists('g:dbgPavimKeyStepOver')
+  let g:dbgPavimKeyStepOver = '<F3>'
+endif
+if !exists('g:dbgPavimKeyStepOut')
+  let g:dbgPavimKeyStepOut = '<F4>'
+endif
+if !exists('g:dbgPavimKeyEval')
+  let g:dbgPavimKeyEval = '<F7>'
+endif
+if !exists('g:dbgPavimKeyRelayout')
+  let g:dbgPavimKeyRelayout = '<F9>'
+endif
+if !exists('g:dbgPavimKeyContextGet')
+  let g:dbgPavimKeyContextGet = '<F11>'
+endif
+if !exists('g:dbgPavimKeyPropertyGet')
+  let g:dbgPavimKeyPropertyGet = '<F12>'
+endif
+exec 'map <silent> '.g:dbgPavimKeyRun.' :python dbgPavim.run()<cr>'
+exec 'map <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
+exec 'map <silent> '.g:dbgPavimKeyToggleBae.' :call Bae()<cr>'
+exec 'map <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
 map <silent> + :call ResizeWindow("+")<cr>
 map <silent> - :call ResizeWindow("-")<cr>
 command! -nargs=? Bp python dbgPavim.mark('<args>')
@@ -124,14 +161,14 @@ command! -nargs=1 Depth let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDept
 command! -nargs=1 Length let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
 
 function! CreateFunctionKeys()
-  map <silent> <F1> :python dbgPavim.ui.help()<cr>
-  map <silent> <F2> :python dbgPavim.command('step_into')<cr>
-  map <silent> <F3> :python dbgPavim.command('step_over')<cr>
-  map <silent> <F4> :python dbgPavim.command('step_out')<cr>
-  map <silent> <F7> :python dbgPavim.watch_input("eval")<cr>A
-  map <silent> <F9> :python dbgPavim.ui.reLayout()<cr>
-  map <silent> <F11> :python dbgPavim.watch_input("context_get")<cr>A<cr>
-  map <silent> <F12> :python dbgPavim.watch_input("property_get", '<cword>')<cr>A<cr>
+  exec 'map <silent> '.g:dbgPavimKeyHelp.' :python dbgPavim.ui.help()<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyStepInto.' :python dbgPavim.command("step_into")<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyStepOver.' :python dbgPavim.command("step_over")<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyStepOut.' :python dbgPavim.command("step_out")<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyEval.' :python dbgPavim.watch_input("eval")<cr>A'
+  exec 'map <silent> '.g:dbgPavimKeyRelayout.' :python dbgPavim.ui.reLayout()<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyContextGet.' :python dbgPavim.watch_input("context_get")<cr>A<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyPropertyGet.' :python dbgPavim.watch_input("property_get", "<cword>")<cr>A<cr>'
   map U u2<C-o>z.
 
   command! -nargs=0 Up python dbgPavim.up()
@@ -141,14 +178,14 @@ function! CreateFunctionKeys()
 endfunction
 function! ClearFunctionKeys()
   try
-    unmap <F1>
-    unmap <F2>
-    unmap <F3>
-    unmap <F4>
-    unmap <F7>
-    unmap <F9>
-    unmap <F11>
-    unmap <F12>
+    exec 'unmap '.g:dbgPavimKeyHelp
+    exec 'unmap '.g:dbgPavimKeyStepInto
+    exec 'unmap '.g:dbgPavimKeyStepOver
+    exec 'unmap '.g:dbgPavimKeyStepOut
+    exec 'unmap '.g:dbgPavimKeyEval
+    exec 'unmap '.g:dbgPavimKeyRelayout
+    exec 'unmap '.g:dbgPavimKeyContextGet
+    exec 'unmap '.g:dbgPavimKeyPropertyGet
     unmap U
 
     delcommand Up

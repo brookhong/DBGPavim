@@ -918,7 +918,7 @@ class DbgListener(Thread):
     c = str(len(self.session_queue))
     self.lock.release()
     dbgPavim.updateStatusLine()
-    print c+" pending connection(s) to be debug, press <F5> to continue."
+    print c+" pending connection(s) to be debug, press "+dbgPavim.dbgPavimKeyRun+" to continue."
   def nextSession(self):
     session = None
     self.lock.acquire()
@@ -1056,6 +1056,7 @@ class DBGPavim:
 
   def loadSettings(self):
     self.port = int(vim.eval('dbgPavimPort'))
+    self.dbgPavimKeyRun = vim.eval('dbgPavimKeyRun')
     self.max_children = vim.eval('dbgPavimMaxChildren')
     self.max_data = vim.eval('dbgPavimMaxData')
     self.max_depth = vim.eval('dbgPavimMaxDepth')
@@ -1209,7 +1210,7 @@ class DBGPavim:
         ar = AsyncRunner(cmd, self.ui.clilog)
         ar.start()
         time.sleep(0.4)
-        vim.eval('feedkeys("\<f5>")')
+        vim.eval('feedkeys("\\'+self.dbgPavimKeyRun+'")')
       else:
         print "Only python and php file debugging are integrated for now."
     else:
