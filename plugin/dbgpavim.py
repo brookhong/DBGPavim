@@ -1039,6 +1039,7 @@ class DBGPavim:
     self.statusline="%<%f\ %h%m%r\ %=%-10.(%l,%c%V%)\ %P\ %=%{'PHP-'}%{(g:dbgPavimBreakAtEntry==1)?'bae':'bap'}"
     self.breakpt    = BreakPoint()
     self.ui         = DebugUI(12, 70)
+    self.watchList  = []
 
   def updateStatusLine(self):
     status = self.debugListener.status()
@@ -1061,6 +1062,7 @@ class DBGPavim:
     self.max_data = vim.eval('dbgPavimMaxData')
     self.max_depth = vim.eval('dbgPavimMaxDepth')
     self.break_at_entry = int(vim.eval('dbgPavimBreakAtEntry'))
+    self.show_context = int(vim.eval('dbgPavimShowContext'))
     self.path_map = vim.eval('dbgPavimPathMap')
     for m in self.path_map:
       m[0] = m[0].replace("\\","/")
@@ -1123,6 +1125,10 @@ class DBGPavim:
         self.debugSession.command(msg, arg1, arg2)
         if self.debugSession.status != 'stopping':
           self.debugSession.command('stack_get')
+          for var in self.watchList:
+            self.debugSession.command('property_get', "-d %d -n %s" % (self.debugSession.curstack, var))
+          if self.show_context:
+            self.debugSession.command('context_get', ('-d %d' % self.debugSession.curstack))
         else:
           self.debugSession.command('stop')
     except:
@@ -1139,6 +1145,14 @@ class DBGPavim:
         self.debugSession.watch_input(cmd, arg)
     except:
       self.handle_exception()
+  def watch(self, name = ''):
+    if name in self.watchList:
+      self.watchList.remove(name)
+    else:
+      self.watchList.append(name)
+  def listWatch(self):
+    for var in self.watchList:
+      print var;
   def property(self, name = ''):
     try:
       if self.debugSession.sock == None:
