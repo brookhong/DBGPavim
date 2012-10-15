@@ -29,10 +29,15 @@ In normal mode
     <F5>      => start debugger backend
     <F6>      => stop debugger backend
     <F8>      => toggle dbgPavimBreakAtEntry, when g:dbgPavimBreakAtEntry=0, debugger backend breaks only at breakpoints.
+    <F10>     => toggle breakpoint at current line
 
     :Bl        => to list all breakpoints
     :Bp        => toggle breakpoint on current line
     :Dp [args] => to debug current file from CLI, it will run 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port=<your_port> <curret_file_in_vim> [args]'
+
+
+    :Wc [$foo] => to toggle watch on variable $foo, if no parameter is provided, it will toggle watch on CONTEXT.
+    :Wl        => to list all watched variables. By default, you can get output like *CONTEXT*, which means context are automatically populated each step in WATCH WINDOW.
 
 In debugging mode
 

@@ -258,7 +258,6 @@ class WatchWindow(VimWindow):
   def fixup_single(self, line, node, level):
     return ''.ljust(level*1) + line + '\n'
   def fixup_childs(self, line, node, level):
-    global z
     if len(node.childNodes)      == 1              and \
        (node.firstChild.nodeType == node.TEXT_NODE  or \
        node.firstChild.nodeType  == node.CDATA_SECTION_NODE):
@@ -272,13 +271,12 @@ class WatchWindow(VimWindow):
         line += '(e:'+encoding+') ' + str(node.firstChild.data) + ';\n'
     else:
       if level == 0:
-        line = ''.ljust(level*1) + str(line) + ';' + '\n'
+        line = ''.ljust(level*1) + str(line) + '\n'
         line += self.xml_stringfy_childs(node, level+1)
-        line += '/*}}}1*/\n'
+        line += '\n'
       else:
-        line = (''.ljust(level*1) + str(line) + ';').ljust(self.width-20) + ''.ljust(level*1) + '/*{{{' + str(level+1) + '*/' + '\n'
+        line = (''.ljust(level*1) + str(line) + ';') + '\n'
         line += str(self.xml_stringfy_childs(node, level+1))
-        line += (''.ljust(level*1) + ''.ljust(level*1)).ljust(self.width-20) + ''.ljust(level*1) + '/*}}}' + str(level+1) + '*/\n'
     return line
   def xml_on_element(self, node):
     if node.nodeName == 'property':
@@ -296,7 +294,7 @@ class WatchWindow(VimWindow):
       else:
         return str('%-20s' % fullname) + ' = (' + self.type + ') '
     elif node.nodeName == 'response':
-      return "$command = '" + node.getAttribute('command') + "'"
+      return '// by ' + node.getAttribute('command')
     else:
       return VimWindow.xml_on_element(self, node)
 
@@ -318,23 +316,23 @@ class WatchWindow(VimWindow):
   def input(self, mode, arg = ''):
     self.prepare()
     line = self.buffer[-1]
-    if line[:len(mode)+1] == '/*{{{1*/ => '+mode+':':
+    if line[:len(mode)+1] == '// => '+mode+':':
       self.buffer[-1] = line + arg
     else:
-      self.buffer.append('/*{{{1*/ => '+mode+': '+arg)
+      self.buffer.append('// => '+mode+': '+arg)
     self.command('normal G')
   def get_command(self):
     line = self.buffer[-1]
-    if line[0:17] == '/*{{{1*/ => exec:':
+    if line[0:11] == '// => exec:':
       print "exec does not supported by xdebug now."
       return ('none', '')
-      #return ('exec', line[17:].strip(' '))
-    elif line[0:17] == '/*{{{1*/ => eval:':
-      return ('eval', line[17:].strip(' '))
-    elif line[0:25] == '/*{{{1*/ => property_get:':
-      return ('property_get', line[25:].strip(' '))
-    elif line[0:24] == '/*{{{1*/ => context_get:':
-      return ('context_get', line[24:].strip(' '))
+      #return ('exec', line[11:].strip(' '))
+    elif line[0:11] == '// => eval:':
+      return ('eval', line[11:].strip(' '))
+    elif line[0:19] == '// => property_get:':
+      return ('property_get', line[19:].strip(' '))
+    elif line[0:18] == '// => context_get:':
+      return ('context_get', line[18:].strip(' '))
     else:
       return ('none', '')
 
@@ -820,7 +818,7 @@ class DbgSessionWithUI(DbgSession):
     self.ui.watchwin.write_xml_childs(res)
   def handle_response_feature_set(self, res):
     """handle <response command=feature_set> tag """
-    self.ui.watchwin.write_xml_childs(res)
+    #self.ui.watchwin.write_xml_childs(res)
   def handle_response_default(self, res):
     """handle <response command=context_get> tag """
     print res.toprettyxml()
@@ -852,7 +850,7 @@ class DbgSessionWithUI(DbgSession):
   def property_get(self, name = ''):
     if name == '':
       name = vim.eval('expand("<cword>")')
-    self.ui.watchwin.write('--> property_get: '+name)
+    self.ui.watchwin.write('// property_get: '+name)
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
 
   def watch_execute(self):
@@ -1146,11 +1144,16 @@ class DBGPavim:
     except:
       self.handle_exception()
   def watch(self, name = ''):
-    if name in self.watchList:
-      self.watchList.remove(name)
+    if name == '':
+      self.show_context = not self.show_context
     else:
-      self.watchList.append(name)
+      if name in self.watchList:
+        self.watchList.remove(name)
+      else:
+        self.watchList.append(name)
   def listWatch(self):
+    if self.show_context:
+      print '*CONTEXT*'
     for var in self.watchList:
       print var;
   def property(self, name = ''):
@@ -1231,7 +1234,7 @@ class DBGPavim:
       print "You need open one python or php file first."
 
   def list(self):
-    self.ui.watchwin.write('--> breakpoints list: ')
+    self.ui.watchwin.write('// breakpoints list: ')
     for bno in self.breakpt.list():
       self.ui.watchwin.write(str(bno)+'  ' + self.breakpt.getfile(bno) + ':' + str(self.breakpt.getline(bno)))
 
