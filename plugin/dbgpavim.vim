@@ -172,14 +172,13 @@ function! CreateFunctionKeys()
   exec 'map <silent> '.g:dbgPavimKeyStepOut.' :python dbgPavim.command("step_out")<cr>'
   exec 'map <silent> '.g:dbgPavimKeyEval.' :python dbgPavim.watch_input("eval")<cr>A'
   exec 'map <silent> '.g:dbgPavimKeyRelayout.' :python dbgPavim.ui.reLayout()<cr>'
-  exec 'map <silent> '.g:dbgPavimKeyContextGet.' :python dbgPavim.watch_input("context_get")<cr>A<cr>'
-  exec 'map <silent> '.g:dbgPavimKeyPropertyGet.' :python dbgPavim.watch_input("property_get", "<cword>")<cr>A<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyContextGet.' :python dbgPavim.context()<cr>'
+  exec 'map <silent> '.g:dbgPavimKeyPropertyGet.' :python dbgPavim.property()<cr>'
   map U u2<C-o>z.
 
   command! -nargs=0 Up python dbgPavim.up()
   command! -nargs=0 Dn python dbgPavim.down()
   command! -nargs=? Pg python dbgPavim.property("<args>")
-  command! -nargs=0 Dt python dbgPavim.ui.trace()
 endfunction
 function! ClearFunctionKeys()
   try
@@ -214,7 +213,7 @@ function! Bae()
 endfunction
 function! WatchWindowOnEnter()
   let l:line = getline(".")
-  if l:line =~ "^\\s*\\$.* = (object) $\\|(array) $"
+  if l:line =~ "^\\s*.* = (.*)+;$"
     execute "Pg ".substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")
     execute "normal \<c-w>p"
   elseif l:line =~ "^\\d\\+  .*:\\d\\+$"

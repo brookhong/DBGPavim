@@ -38,7 +38,7 @@ import vim
 import socket
 import base64
 import traceback
-import xml.dom.minidom
+import xml.etree.ElementTree as ET
 
 import string
 import time, subprocess
@@ -81,31 +81,6 @@ class VimWindow:
     return int(vim.eval("winwidth(bufwinnr('"+self.name+"'))"))
   def getHeight(self):
     return int(vim.eval("winheight(bufwinnr('"+self.name+"'))"))
-  def xml_on_element(self, node):
-    line = str(node.nodeName)
-    if node.hasAttributes():
-      for (n,v) in node.attributes.items():
-        line += str(' %s=%s' % (n,v))
-    return line
-  def xml_on_attribute(self, node):
-    return str(node.nodeName)
-  def xml_on_entity(self, node):
-    return 'entity node'
-  def xml_on_comment(self, node):
-    return 'comment node'
-  def xml_on_document(self, node):
-    return '#document'
-  def xml_on_document_type(self, node):
-    return 'document type node'
-  def xml_on_notation(self, node):
-    return 'notation node'
-  def xml_on_text(self, node):
-    return node.data
-  def xml_on_processing_instruction(self, node):
-    return 'processing instruction'
-  def xml_on_cdata_section(self, node):
-    return node.data
-
   def write(self, msg):
     """ append last """
     self.prepare()
@@ -148,89 +123,26 @@ class VimWindow:
     if winnr != int(vim.eval("winnr()")):
       vim.command(str(winnr) + 'wincmd w')
     vim.command(cmd)
-
-  def _xml_stringfy(self, node, level = 0, encoding = None):
-    if node.nodeType   == node.ELEMENT_NODE:
-      line = self.xml_on_element(node)
-
-    elif node.nodeType == node.ATTRIBUTE_NODE:
-      line = self.xml_on_attribute(node)
-
-    elif node.nodeType == node.ENTITY_NODE:
-      line = self.xml_on_entity(node)
-
-    elif node.nodeType == node.COMMENT_NODE:
-      line = self.xml_on_comment(node)
-
-    elif node.nodeType == node.DOCUMENT_NODE:
-      line = self.xml_on_document(node)
-
-    elif node.nodeType == node.DOCUMENT_TYPE_NODE:
-      line = self.xml_on_document_type(node)
-
-    elif node.nodeType == node.NOTATION_NODE:
-      line = self.xml_on_notation(node)
-
-    elif node.nodeType == node.PROCESSING_INSTRUCTION_NODE:
-      line = self.xml_on_processing_instruction(node)
-
-    elif node.nodeType == node.CDATA_SECTION_NODE:
-      line = self.xml_on_cdata_section(node)
-
-    elif node.nodeType == node.TEXT_NODE:
-      line = self.xml_on_text(node)
-
-    else:
-      line = 'unknown node type'
-
-    if node.hasChildNodes():
-      #print ''.ljust(level*4) + '{{{' + str(level+1)
-      #print ''.ljust(level*4) + line
-      return self.fixup_childs(line, node, level)
-    else:
-      return self.fixup_single(line, node, level)
-
-    return line
-
-  def fixup_childs(self, line, node, level):
-    line = ''.ljust(level*4) + line +  '\n'
-    line += self.xml_stringfy_childs(node, level+1)
-    return line
-  def fixup_single(self, line, node, level):
-    return ''.ljust(level*4) + line + '\n'
-
-  def xml_stringfy(self, xml):
-    return self._xml_stringfy(xml)
-  def xml_stringfy_childs(self, node, level = 0):
-    line = ''
-    for cnode in node.childNodes:
-      line = str(line)
-      line += str(self._xml_stringfy(cnode, level))
-    return line
-
-  def write_xml(self, xml):
-    self.write(self.xml_stringfy(xml))
-  def write_xml_childs(self, xml):
-    self.write(self.xml_stringfy_childs(xml))
+  def render(self, xml):
+    self.write(ET.tostring(xml))
 
 class StackWindow(VimWindow):
   def __init__(self, name = 'STACK_WINDOW'):
     VimWindow.__init__(self, name)
-  def xml_on_element(self, node):
-    if node.nodeName != 'stack':
-      return VimWindow.xml_on_element(self, node)
-    else:
-      if node.getAttribute('where') != '{main}':
-        fmark = '()'
+  def render(self, xml):
+    lines = ""
+    for node in xml:
+      if node.tag != '{urn:debugger_protocol_v1}stack':
+        return VimWindow.render(self, node)
       else:
-        fmark = ''
-      [fn, win] = getFilePath(node.getAttribute('filename'))
-      fn = dbgPavim.localPathOf(fn)
-      return str('%-2s %-15s %s:%s' % (      \
-          node.getAttribute('level'),        \
-          node.getAttribute('where')+fmark,  \
-          fn, \
-          node.getAttribute('lineno')))
+        if node.get('where') != '{main}':
+          fmark = '()'
+        else:
+          fmark = ''
+        [fn, win] = getFilePath(node.get('filename'))
+        fn = dbgPavim.localPathOf(fn)
+        lines += str('%-2s %-15s %s:%s\n' % (node.get('level'), node.get('where')+fmark, fn, node.get('lineno')))
+    self.write(lines)
   def on_create(self):
     self.command('highlight CurStack term=reverse ctermfg=White ctermbg=Red gui=reverse')
     self.highlight_stack(0)
@@ -238,101 +150,86 @@ class StackWindow(VimWindow):
     self.command('syntax clear')
     self.command('syntax region CurStack start="^' +str(no)+ ' " end="$"')
 
-class TraceWindow(VimWindow):
-  def __init__(self, name = 'TRACE_WINDOW'):
-    VimWindow.__init__(self, name)
-  def xml_on_element(self, node):
-    if node.nodeName != 'error':
-      return VimWindow.xml_on_element(self, node)
-    else:
-      desc = ''
-      if node.hasAttribute('code'):
-        desc = ' : '+error_msg[int(node.getAttribute('code'))]
-      return VimWindow.xml_on_element(self, node) + desc
-  def on_create(self):
-    self.command('set wrap fdm=marker fmr={{{,}}} fdl=0')
-
 class WatchWindow(VimWindow):
   def __init__(self, name = 'WATCH_WINDOW'):
     VimWindow.__init__(self, name)
-  def fixup_single(self, line, node, level):
-    return ''.ljust(level*1) + line + '\n'
-  def fixup_childs(self, line, node, level):
-    if len(node.childNodes)      == 1              and \
-       (node.firstChild.nodeType == node.TEXT_NODE  or \
-       node.firstChild.nodeType  == node.CDATA_SECTION_NODE):
-      line = str(''.ljust(level*1) + line)
-      encoding = node.getAttribute('encoding')
-      if encoding == 'base64':
-        line += "'" + base64.decodestring(str(node.firstChild.data)) + "';\n"
-      elif encoding == '':
-        line += str(node.firstChild.data) + ';\n'
+  def decode_string(self, msg, encoding):
+    if encoding == 'base64':
+      value = base64.decodestring(msg)
+    elif encoding == '' or encoding == None:
+      value = msg
+    else:
+      value = "(e:%s) %s" % (encoding, p.text)
+    return value
+  def write_property1(self, p, level, command = None):
+    size = p.get('size')
+    size = ('[%s]' % (size)) if size != None else ""
+    if p.text != None:
+      value = "(%s%s) '%s'" % (p.get('type'), size, self.decode_string(p.text, p.get('encoding')))
+    else:
+      value = "(%s%s)+" % (p.get('type'), size)
+    name = p.get('fullname')
+    if name == None:
+      name = p.get('name')
+      if command == 'eval':
+        name = "$evalResult" if (name == None) else ('$evalResult->%s'%(name))
       else:
-        line += '(e:'+encoding+') ' + str(node.firstChild.data) + ';\n'
+        name = "" if (name == None) else name
+    self.write('%s%s = %s;' % (" "*level,name.ljust(32-level), value))
+    properties = p.findall('{urn:debugger_protocol_v1}property')
+    for pp in properties:
+      self.write_property1(pp, level+2, command)
+  def write_property2(self, p, level, command = None):
+    fullname_node = p.find('{urn:debugger_protocol_v1}fullname')
+    fullname = self.decode_string(fullname_node.text, fullname_node.get('encoding'))
+    value_node = p.find('{urn:debugger_protocol_v1}value')
+    size = p.get('size')
+    size = ('[%s]' % (size)) if size != None else ""
+    if value_node != None and value_node.text != None:
+      value = "(%s%s) '%s'" % (p.get('type'), size, self.decode_string(value_node.text, value_node.get('encoding')))
     else:
-      if level == 0:
-        line = ''.ljust(level*1) + str(line) + '\n'
-        line += self.xml_stringfy_childs(node, level+1)
-        line += '\n'
+      value = "(%s%s)+" % (p.get('type'), size)
+    self.write('%s%s = %s;' % (" "*level, fullname.ljust(32-level), value))
+    properties = p.findall('{urn:debugger_protocol_v1}property')
+    for pp in properties:
+      self.write_property2(pp, level+2, command)
+  def render(self, xml, level = 0):
+    command = xml.get('command')
+    if command != None and command != 'eval':
+      self.write(self.commenter+"by "+xml.get('command'))
+    properties = xml.findall('{urn:debugger_protocol_v1}property')
+    for p in properties:
+      if p.find('{urn:debugger_protocol_v1}fullname') != None:
+        self.write_property2(p, level, command)
       else:
-        line = (''.ljust(level*1) + str(line) + ';') + '\n'
-        line += str(self.xml_stringfy_childs(node, level+1))
-    return line
-  def xml_on_element(self, node):
-    if node.nodeName == 'property':
-      self.type = node.getAttribute('type')
-
-      name      = node.getAttribute('name')
-      fullname  = node.getAttribute('fullname')
-      if name == '':
-        name = 'EVAL_RESULT'
-      if fullname == '':
-        fullname = 'EVAL_RESULT'
-
-      if self.type == 'uninitialized':
-        return str(('%-20s' % name) + " = /* uninitialized */'';")
-      else:
-        return str('%-20s' % fullname) + ' = (' + self.type + ') '
-    elif node.nodeName == 'response':
-      return '// by ' + node.getAttribute('command')
-    else:
-      return VimWindow.xml_on_element(self, node)
-
-  def xml_on_text(self, node):
-    if self.type == 'string':
-      return "'" + str(node.data) + "'"
-    else:
-      return str(node.data)
-  def xml_on_cdata_section(self, node):
-    if self.type == 'string':
-      return "'" + str(node.data) + "'"
-    else:
-      return str(node.data)
+        self.write_property1(p, level, command)
+    if level == 0:
+      self.write("\n")
   def on_create(self):
-    self.write('<?')
+    self.commenter = '// '
+    if dbgPavim.fileType == 'php':
+      self.write('<?')
+    elif dbgPavim.fileType == 'python':
+      self.commenter = '# '
     self.command('inoremap <buffer> <cr> <esc>:python dbgPavim.debugSession.watch_execute()<cr>')
     self.command('set noai nocin')
-    self.command('set wrap fdm=manual fmr={{{,}}} ft=php fdl=1')
+    self.command('set wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % (dbgPavim.fileType))
   def input(self, mode, arg = ''):
     self.prepare()
     line = self.buffer[-1]
-    if line[:len(mode)+1] == '// => '+mode+':':
+    if line[:len(mode)+1] == self.commenter+'=> '+mode+':':
       self.buffer[-1] = line + arg
     else:
-      self.buffer.append('// => '+mode+': '+arg)
+      self.buffer.append(self.commenter+'=> '+mode+': '+arg)
     self.command('normal G')
   def get_command(self):
     line = self.buffer[-1]
-    if line[0:11] == '// => exec:':
+    if line[0:11] == self.commenter+'=> exec:':
       print "exec does not supported by xdebug now."
       return ('none', '')
       #return ('exec', line[11:].strip(' '))
-    elif line[0:11] == '// => eval:':
+    elif line[0:11] == self.commenter+'=> eval:':
       return ('eval', line[11:].strip(' '))
-    elif line[0:19] == '// => property_get:':
-      return ('property_get', line[19:].strip(' '))
-    elif line[0:18] == '// => context_get:':
-      return ('context_get', line[18:].strip(' '))
     else:
       return ('none', '')
 
@@ -375,30 +272,29 @@ class DebugUI:
     self.stackwin       = StackWindow()
     self.stackwinHeight = stackwinHeight
     self.watchwinWidth  = watchwinWidth
-    self.tracewin       = None
+    self.tracelog       = open(os.getenv("HOME").replace("\\","/")+"/.dbgpavim.trace",'w')
+    #self.tracelog       = open(os.devnull,'w')
     self.helpwin        = None
     self.mode           = DebugUI.NORMAL
     self.file           = None
     self.line           = None
     self.winbuf         = {}
     self.cursign        = None
-    self.sessfile       = os.getenv("HOME").replace("\\","/")+"/dbgpavim_saved_session." + str(os.getpid())
-    self.clilog         = os.getenv("HOME").replace("\\","/")+"/dbgpavim_cli." + str(os.getpid())
+    self.sessfile       = os.getenv("HOME").replace("\\","/")+"/.dbgpavim.session"
+    self.clilog         = os.getenv("HOME").replace("\\","/")+"/.dbgpavim.cli"
     self.cliwin         = None
     self.backup_ssop    = vim.eval('&ssop')
 
-  def trace(self):
-    if self.tracewin:
-      self.tracewin.destroy()
-      self.tracewin = None
-    else:
-      self.tracewin = TraceWindow()
-      self.tracewin.create('belowright new')
+  def trace(self, log = None):
+    if log != None:
+      self.tracelog.write("\n"+log+"\n")
+      self.tracelog.flush()
 
   def debug_mode(self):
     """ change mode to debug """
     if self.mode == DebugUI.DEBUG:
       return
+    dbgPavim.fileType = vim.eval('&ft')
     self.mode = DebugUI.DEBUG
     # save session
     vim.command('set ssop-=tabpages')
@@ -481,8 +377,6 @@ class DebugUI:
     """ destroy windows """
     self.watchwin.destroy()
     self.stackwin.destroy()
-    if self.tracewin:
-      self.tracewin.destroy()
     if self.cliwin:
       self.cliwin.destroy()
   def go_srcview(self):
@@ -531,11 +425,12 @@ class DbgSession:
   def handle_response_breakpoint_set(self, res):
     """handle <response command=breakpoint_set> tag
     <responsponse command="breakpoint_set" id="110180001" transaction_id="1"/>"""
-    if res.firstChild.hasAttribute('id'):
-      tid = int(res.firstChild.getAttribute('transaction_id'))
+    tid = res.get('transaction_id')
+    if tid != None:
+      tid = int(tid)
       bno = self.bptsetlst[tid]
       del self.bptsetlst[tid]
-      self.bptsetids[bno] = res.firstChild.getAttribute('id')
+      self.bptsetids[bno] = res.get('id')
   def getbid(self, bno):
     """ get Debug Server's breakpoint numbered with bno """
     if bno in self.bptsetids:
@@ -575,16 +470,18 @@ class DbgSession:
     self.recv_null()
     return body
   def send_msg(self, cmd):
+    dbgPavim.ui.trace(str(self.msgid)+">"*16+"\n"+cmd)
     self.sock.send(cmd + '\0')
   def handle_recvd_msg(self, res):
-    resDom = xml.dom.minidom.parseString(res)
-    if resDom.firstChild.tagName == "response":
-      if resDom.firstChild.getAttribute('command') == "breakpoint_set":
+    dbgPavim.ui.trace(str(self.msgid)+"<"*16+"\n"+res)
+    resDom = ET.fromstring(res)
+    if resDom.tag == "response":
+      if resDom.get('command') == "breakpoint_set":
         self.handle_response_breakpoint_set(resDom)
-      if resDom.firstChild.getAttribute('command') == "stop":
+      if resDom.get('command') == "stop":
         self.close()
-    elif resDom.firstChild.tagName == "init":
-      [fn, self.isWinServer] = getFilePath(resDom.firstChild.getAttribute('fileuri'))
+    elif resDom.tag == "init":
+      [fn, self.isWinServer] = getFilePath(resDom.get('fileuri'))
     return resDom
   def send_command(self, cmd, arg1 = '', arg2 = ''):
     self.msgid = self.msgid + 1
@@ -601,7 +498,7 @@ class DbgSession:
       self.latestRes = self.recv_msg()
       resDom = self.handle_recvd_msg(self.latestRes)
       try:
-        if int(resDom.firstChild.getAttribute('transaction_id')) == int(self.msgid):
+        if int(resDom.get('transaction_id')) == int(self.msgid):
           return resDom
       except:
         pass
@@ -669,34 +566,32 @@ class DbgSessionWithUI(DbgSession):
     """ send message """
     self.sock.send(cmd + '\0')
     # log message
-    if self.ui.tracewin:
-      self.ui.tracewin.write(str(self.msgid) + ' : send =====> ' + cmd)
+    dbgPavim.ui.trace(str(self.msgid)+">"*16+"\n"+cmd)
   def handle_recvd_msg(self, txt):
-    # log messages {{{
-    if self.ui.tracewin:
-      self.ui.tracewin.write( str(self.msgid) + ' : recv <===== {{{   ' + txt)
-      self.ui.tracewin.write('}}}')
-    res = xml.dom.minidom.parseString(txt)
+    # log messages
+    txt = txt.replace('\n','')
+    dbgPavim.ui.trace(str(self.msgid)+"<"*16+"\n"+txt)
+    resDom = ET.fromstring(txt)
+    tag = resDom.tag.replace("{urn:debugger_protocol_v1}","")
     """ call appropraite message handler member function, handle_XXX() """
-    fc = res.firstChild
     try:
-      handler = getattr(self, 'handle_' + fc.tagName)
-      handler(res)
+      handler = getattr(self, 'handle_' + tag)
+      handler(resDom)
     except AttributeError:
-      print 'DBGPavim.handle_'+fc.tagName+'() not found, please see the LOG___WINDOW'
+      print 'DBGPavim.handle_'+tag+'() not found, please see the LOG___WINDOW'
     self.ui.go_srcview()
-    return res
+    return resDom
   def handle_response(self, res):
     """ call appropraite response message handler member function, handle_response_XXX() """
-    if res.firstChild.hasAttribute('reason') and res.firstChild.getAttribute('reason') == 'error':
+    if res.get('reason') == 'error':
       self.handle_response_error(res)
       return
-    errors  = res.getElementsByTagName('error')
-    if len(errors)>0:
+    errors  = res.find('{urn:debugger_protocol_v1}error')
+    if errors != None:
       self.handle_response_error(res)
       return
 
-    command = res.firstChild.getAttribute('command')
+    command = res.get('command')
     try:
       handler = getattr(self, 'handle_response_' + command)
     except AttributeError:
@@ -724,20 +619,14 @@ class DbgSessionWithUI(DbgSession):
       </copyright>
     </init>"""
 
-    [fn, self.isWinServer] = getFilePath(res.firstChild.getAttribute('fileuri'))
+    [fn, self.isWinServer] = getFilePath(res.get('fileuri'))
     fn = dbgPavim.localPathOf(fn)
     self.ui.set_srcview(fn, 1)
 
   def handle_response_error(self, res):
     """ handle <error> tag """
-    if self.ui.tracewin:
-      self.ui.tracewin.write_xml_childs(res)
-    errors  = res.getElementsByTagName('error')
-    for error in errors:
-      code = int(error.getAttribute('code'))
-      if code == 5:
-        self.command('run')
-        break
+    self.ui.trace(ET.tostring(res))
+    errors  = res.find('{urn:debugger_protocol_v1}error')
 
   def handle_response_stack_get(self, res):
     """handle <response command=stack_get> tag
@@ -751,74 +640,66 @@ class DbgSessionWithUI(DbgSession):
       </stack>
     </response>
     """
-
-    stacks = res.getElementsByTagName('stack')
+    stacks = res.findall('{urn:debugger_protocol_v1}stack')
     if len(stacks)>0:
       self.curstack  = 0
       self.laststack = len(stacks) - 1
 
       self.stacks    = []
       for s in stacks:
-        [fn, win] = getFilePath(s.getAttribute('filename'))
+        [fn, win] = getFilePath(s.get('filename'))
         fn = dbgPavim.localPathOf(fn)
         self.stacks.append( {'file':  fn, \
-                             'line':  int(s.getAttribute('lineno')),  \
-                             'where': s.getAttribute('where'),        \
-                             'level': int(s.getAttribute('level'))
+                             'line':  int(s.get('lineno')),  \
+                             'where': s.get('where'),        \
+                             'level': int(s.get('level'))
                              } )
 
       self.ui.stackwin.clean()
       self.ui.stackwin.highlight_stack(self.curstack)
-
-      self.ui.stackwin.write_xml_childs(res.firstChild) #str(res.toprettyxml()))
+      self.ui.stackwin.render(stacks)
       self.ui.set_srcview( self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'] )
-
 
   def handle_response_step_out(self, res):
     """handle <response command=step_out> tag
     <response command="step_out" reason="ok" status="break" transaction_id="1 "/>"""
-    if res.firstChild.hasAttribute('reason') and res.firstChild.getAttribute('reason') == 'ok':
-      if res.firstChild.hasAttribute('status'):
-        self.status = res.firstChild.getAttribute('status')
+    if res.get('reason') == 'ok':
+      self.status = res.get('status')
       return
     else:
       print res.toprettyxml()
   def handle_response_step_over(self, res):
     """handle <response command=step_over> tag
     <response command="step_over" reason="ok" status="break" transaction_id="1 "/>"""
-    if res.firstChild.hasAttribute('reason') and res.firstChild.getAttribute('reason') == 'ok':
-      if res.firstChild.hasAttribute('status'):
-        self.status = res.firstChild.getAttribute('status')
+    if res.get('reason') == 'ok':
+      self.status = res.get('status')
       return
     else:
       print res.toprettyxml()
   def handle_response_step_into(self, res):
     """handle <response command=step_into> tag
     <response command="step_into" reason="ok" status="break" transaction_id="1 "/>"""
-    if res.firstChild.hasAttribute('reason') and res.firstChild.getAttribute('reason') == 'ok':
-      if res.firstChild.hasAttribute('status'):
-        self.status = res.firstChild.getAttribute('status')
+    if res.get('reason') == 'ok':
+      self.status = res.get('status')
       return
     else:
       print res.toprettyxml()
   def handle_response_run(self, res):
     """handle <response command=run> tag
     <response command="step_over" reason="ok" status="break" transaction_id="1 "/>"""
-    if res.firstChild.hasAttribute('status'):
-      self.status = res.firstChild.getAttribute('status')
-      return
+    self.status = res.get('status')
   def handle_response_eval(self, res):
     """handle <response command=eval> tag """
-    self.ui.watchwin.write_xml_childs(res)
+    self.ui.watchwin.render(res)
   def handle_response_property_get(self, res):
     """handle <response command=property_get> tag """
-    self.ui.watchwin.write_xml_childs(res)
+    self.ui.watchwin.render(res)
   def handle_response_context_get(self, res):
     """handle <response command=context_get> tag """
-    self.ui.watchwin.write_xml_childs(res)
+    self.ui.watchwin.render(res)
   def handle_response_feature_set(self, res):
     """handle <response command=feature_set> tag """
-    #self.ui.watchwin.write_xml_childs(res)
+    #self.ui.watchwin.render(res)
   def handle_response_default(self, res):
     """handle <response command=context_get> tag """
     print res.toprettyxml()
@@ -844,13 +725,9 @@ class DbgSessionWithUI(DbgSession):
       self.ui.stackwin.highlight_stack(self.curstack)
       self.ui.set_srcview(self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'])
 
-  def watch_input(self, mode, arg = ''):
-    self.ui.watchwin.input(mode, arg)
-
   def property_get(self, name = ''):
     if name == '':
       name = vim.eval('expand("<cword>")')
-    self.ui.watchwin.write('// property_get: '+name)
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
 
   def watch_execute(self):
@@ -860,14 +737,8 @@ class DbgSessionWithUI(DbgSession):
       self.command('exec', '', expr)
       print cmd, '--', expr
     elif cmd == 'eval':
-      self.command('eval', '', expr)
+      self.command('eval', '', '$evalResult=(%s)' %(expr))
       print cmd, '--', expr
-    elif cmd == 'property_get':
-      self.command('property_get', '-d %d -n %s' % (self.curstack,  expr))
-      print cmd, '-n ', expr
-    elif cmd == 'context_get':
-      self.command('context_get', ('-d %d' % self.curstack))
-      print cmd
     else:
       print "no commands", cmd, expr
 
@@ -879,10 +750,8 @@ class DbgSilentClient(Thread):
     self.session.init()
     self.session.sock.settimeout(None)
 
-    resDom = self.session.command("run")
-    status = "stopping"
-    if resDom.firstChild.hasAttribute('status'):
-      status = resDom.firstChild.getAttribute('status')
+    resDom = self.session.command('run')
+    status = resDom.get('status')
     if status == "stopping":
       self.session.command("stop")
     elif status == "break":
@@ -1090,9 +959,8 @@ class DBGPavim:
     if self.debugSession.sock != None:
       self.debugSession.command('feature_set', '-n max_data -v ' + self.max_data)
   def handle_exception(self):
-    if self.ui.tracewin:
-      self.ui.tracewin.write(sys.exc_info())
-      self.ui.tracewin.write("".join(traceback.format_tb( sys.exc_info()[2])))
+    self.ui.trace(str(sys.exc_info()[1]))
+    self.ui.trace("".join(traceback.format_tb( sys.exc_info()[2])))
     errno = sys.exc_info()[0]
 
     session = self.debugListener.nextSession()
@@ -1131,18 +999,10 @@ class DBGPavim:
           self.debugSession.command('stop')
     except:
       self.handle_exception()
+  def context(self):
+    self.debugSession.command('context_get', ('-d %d' % self.debugSession.curstack))
   def watch_input(self, cmd, arg = ''):
-    try:
-      if self.debugSession.sock == None:
-        print 'No debug session started.'
-      else:
-        if arg == '<cword>':
-          arg = vim.eval('expand("<cword>")')
-        if arg == 'this':
-          arg = '$this'
-        self.debugSession.watch_input(cmd, arg)
-    except:
-      self.handle_exception()
+    self.debugSession.ui.watchwin.input(cmd, arg)
   def watch(self, name = ''):
     if name == '':
       self.show_context = not self.show_context
@@ -1155,7 +1015,7 @@ class DBGPavim:
     if self.show_context:
       print '*CONTEXT*'
     for var in self.watchList:
-      print var;
+      print var
   def property(self, name = ''):
     try:
       if self.debugSession.sock == None:
@@ -1234,7 +1094,7 @@ class DBGPavim:
       print "You need open one python or php file first."
 
   def list(self):
-    self.ui.watchwin.write('// breakpoints list: ')
+    self.ui.watchwin.write(self.ui.watchwin.commenter+'breakpoints list: ')
     for bno in self.breakpt.list():
       self.ui.watchwin.write(str(bno)+'  ' + self.breakpt.getfile(bno) + ':' + str(self.breakpt.getline(bno)))
 
@@ -1306,4 +1166,3 @@ error_msg = { \
     998 : """An internal exception in the debugger occurred""",                                                                                                                \
     999 : """Unknown error """                                                                                                                                                 \
 }
-
