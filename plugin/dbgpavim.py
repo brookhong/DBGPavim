@@ -295,6 +295,7 @@ class DebugUI:
     if self.mode == DebugUI.DEBUG:
       return
     dbgPavim.fileType = vim.eval('&ft')
+    vim.command('let g:dbgPavimTab=tabpagenr()')
     self.mode = DebugUI.DEBUG
     # save session
     vim.command('set ssop-=tabpages')
@@ -314,13 +315,13 @@ class DebugUI:
 
     self.set_highlight()
 
-    vim.command('call CreateFunctionKeys()')
   def normal_mode(self):
     """ restore mode to normal """
     if self.mode == DebugUI.NORMAL:
       return
 
-    vim.command('call ClearFunctionKeys()')
+    vim.command('exec "normal ".g:dbgPavimTab."gt"')
+    vim.command('unlet g:dbgPavimTab')
     vim.command('sign unplace 1')
     vim.command('sign unplace 2')
 
