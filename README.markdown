@@ -52,7 +52,7 @@ In debugging mode
     <F11>     => shows all variables
     <F12>     => shows variable on current cursor
 
-You can define your own key mappings as blow --
+You can define your own key mappings as below --
 
     let g:dbgPavimKeyRun = '<F8>'
     let g:dbgPavimKeyStepOver = '<F10>'
