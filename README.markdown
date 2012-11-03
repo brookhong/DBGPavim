@@ -1,4 +1,4 @@
-This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
+This is a plugin to enable php debuging in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
 But most of the code, especially the debugger backend has been rewritten.
 
 Tested with --
@@ -7,19 +7,19 @@ Tested with --
 * XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux
 * XDebug 2.2 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
 
-Some screenshots (under Windows 7) are here at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
+Some screenshots (under Windows 7) are here: http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
 
 ## The enhancements are --
 
 ### Non blocking debugger backend.
-So that VIM users do not need to wait for connection from apache server. No timeout things, users press F5 to start debugger backend, and uses his/her VIM normally. Debug backend won't stop users to interact with VIM. Users can press F6 to stop debugger backend anytime.
+So that VIM users do not need to wait for connection from server. No timeouts; users press F5 to start debugger backend and use VIM normally. Debug backend won't stop users from interacting with VIM. Users can press F6 to stop debugger backend at any time.
 
 ### Catch all connections from apache server.
-This is very important for a large website, especially for thoes pages who contain AJAX requests. In that case, one reload of a page may trigger dozens of http request, each of them goes to a different URL. The new debugger backend will catch all connections from apache server. Users can debug all of them without missing anyone.
+This is very important for a large website, especially for pages that contain AJAX requests. In that case, one reload of a page may trigger dozens of HTTP requests, each of them going to a different URL. The new debugger backend will catch all connections from the server.
 
 ### Break only at breakpoints
 
-    Now the debugger backend breaks only at breakpoints by default, if you would like the debugger backend to break at entry, then add below line to your vimrc --
+The debugger backend breaks only at breakpoints by default. If you would like the debugger backend to break at entry, then add below line to your vimrc --
     let g:dbgPavimBreakAtEntry = 1
 
 ### New commands and function keys
@@ -113,13 +113,13 @@ In Stack window
 
 ## Usage
 
-* Make sure your vim has python(at least 2.3) supported, in vim with command
+* Make sure your vim has python (at least 2.3) supported: in vim with command
 
     <pre>
     :version
     </pre>
 
-    In case of your VIM don't support python, download VIM source package from http://www.vim.org/download.php, then build your own VIM with commands --
+In case of your VIM don't support python, download VIM source package from http://www.vim.org/download.php, then build your own VIM --
 
     <pre>
     ./configure --prefix=/opt/vim --enable-pythoninterp --with-python-config-dir=/usr/lib/python2.4/config
@@ -157,9 +157,9 @@ In Stack window
 
 * Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1.
 
-If you are tied of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox with help of GreaseMonkey.
+If you are tired of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox via GreaseMonkey.
 
-Or modify your apache configuration(httpd.conf) --
+Or modify your apache configuration (httpd.conf) --
 
   <pre>
   <VirtualHost>
@@ -184,7 +184,8 @@ Or modify your apache configuration(httpd.conf) --
     </pre>
 
 ## Python debugging
-DBGPavim is both a DBGP protocol server and VIM debugger backend, it can help to debug Python code.
+DBGPavim is both a DBGP protocol server and VIM debugger backend, so it can help to debug Python code.
+
 I haved tried it with --
 * Komodo Python Remote Debugging Client --Python 2.7 - MacVim 7.3 @ Mac OS X 10.8
 
