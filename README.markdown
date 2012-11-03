@@ -19,7 +19,8 @@ This is very important for a large website, especially for pages that contain AJ
 
 ### Break only at breakpoints
 
-The debugger backend breaks only at breakpoints by default. If you would like the debugger backend to break at entry, then add below line to your vimrc --
+The debugger backend breaks only at breakpoints by default. If you would like the debugger backend to break at entry, then add below line to your vimrc:
+
     let g:dbgPavimBreakAtEntry = 1
 
 ### New commands and function keys
