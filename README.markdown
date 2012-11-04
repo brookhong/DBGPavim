@@ -1,25 +1,27 @@
-This is a plugin to enable php debug in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
+This is a plugin to enable php debuging in VIM with Xdebug, which originates from http://www.vim.org/scripts/script.php?script_id=1152.
 But most of the code, especially the debugger backend has been rewritten.
 
-Tested with --
+Tested with:
+
 * XDebug 2.2 - PHP 5.4 - GVIM 7.3 - Python 2.7 @ Windows 7
 * XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
 * XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux
 * XDebug 2.2 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
 
-Some screenshots (under Windows 7) are here at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
+Some screenshots (under Windows 7) are here: http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
 
-## The enhancements are --
+## Enhancements
 
 ### Non blocking debugger backend.
-So that VIM users do not need to wait for connection from apache server. No timeout things, users press F5 to start debugger backend, and uses his/her VIM normally. Debug backend won't stop users to interact with VIM. Users can press F6 to stop debugger backend anytime.
+So that VIM users do not need to wait for connection from server. No timeouts; users press F5 to start debugger backend and use VIM normally. Debug backend won't stop users from interacting with VIM. Users can press F6 to stop debugger backend at any time.
 
 ### Catch all connections from apache server.
-This is very important for a large website, especially for thoes pages who contain AJAX requests. In that case, one reload of a page may trigger dozens of http request, each of them goes to a different URL. The new debugger backend will catch all connections from apache server. Users can debug all of them without missing anyone.
+This is very important for a large website, especially for pages that contain AJAX requests. In that case, one reload of a page may trigger dozens of HTTP requests, each of them going to a different URL. The new debugger backend will catch all connections from the server.
 
 ### Break only at breakpoints
 
-    Now the debugger backend breaks only at breakpoints by default, if you would like the debugger backend to break at entry, then add below line to your vimrc --
+The debugger backend breaks only at breakpoints by default. If you would like the debugger backend to break at entry, then add below line to your vimrc:
+
     let g:dbgPavimBreakAtEntry = 1
 
 ### New commands and function keys
@@ -52,7 +54,7 @@ In debugging mode
     <F11>     => shows all variables
     <F12>     => shows variable on current cursor
 
-You can define your own key mappings as blow --
+You can define your own key mappings as below:
 
     let g:dbgPavimKeyRun = '<F8>'
     let g:dbgPavimKeyStepOver = '<F10>'
@@ -85,9 +87,9 @@ In Stack window
 
 ### Status line for debugger backend
 
-    After user press <F5> to start debugger backend, a string like "PHP-bae-LISN" will show up at the right side of status line.
+After user press <F5> to start debugger backend, a string like "PHP-bae-LISN" will show up at the right side of status line.
 
-    The status string looks like --
+The status string looks like:
 
     PHP-<bae|bap>-<LISN|PENDn|CONN|CLSD>
 
@@ -103,36 +105,28 @@ In Stack window
 
 ### Remote debugging
 
-    In case that you need run VIM on a different machine from server where apache httpd runs, configuration for DBGPavim --
+In case that you need run VIM on a different machine from server where apache httpd runs, configuration for DBGPavim:
 
     let g:dbgPavimPathMap = [['D:/works/php','/var/www'],]
 
-    Some change for Apache configuration is also necessary --
+A change to the Apache configuration is also necessary:
 
     php_value xdebug.remote_host <ip_address_where_you_run_vim>
 
 ## Usage
 
-* Make sure your vim has python(at least 2.3) supported, in vim with command
+* Make sure your vim has python (at least 2.3) supported. To check, run `:version` in vim.
 
-    <pre>
-    :version
-    </pre>
+If your VIM doesn't support python, download VIM source package from http://www.vim.org/download.php, then build your own VIM:
 
-    In case of your VIM don't support python, download VIM source package from http://www.vim.org/download.php, then build your own VIM with commands --
-
-    <pre>
     ./configure --prefix=/opt/vim --enable-pythoninterp --with-python-config-dir=/usr/lib/python2.4/config
     make
     make install
-    </pre>
 
 * Install xdebug for php, and edit php.ini
 
-    <pre>
     zend_extension=path_to_xdebug.so
     xdebug.remote_enable=1
-    </pre>
 
 * Edit your ~/.vimrc
 
@@ -143,11 +137,9 @@ In Stack window
 
 * Edit your apche configure file
 
-    In your VirtualHost section, set debugger port same as the one in your vimrc
+In your VirtualHost section, set debugger port same as the one in your vimrc:
 
-    <pre>
     php_value xdebug.remote_port 9009
-    </pre>
 
 * Save dbgpavim.py and dbgpavim.vim to your ~/.vim/plugin
 
@@ -157,35 +149,31 @@ In Stack window
 
 * Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1.
 
-If you are tied of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox with help of GreaseMonkey.
+If you are tired of adding XDEBUG_SESSION_START=1 in query string, there is a XDEBUG_SESSION helper at http://userscripts.org/scripts/review/132695, a user script for Google Chrome. It also works for Firefox via GreaseMonkey.
 
-Or modify your apache configuration(httpd.conf) --
+Or modify your apache configuration (httpd.conf) --
 
-  <pre>
-  <VirtualHost>
+    <VirtualHost>
       ...
       php_value xdebug.remote_port 9009
       php_value xdebug.remote_autostart 1
-  </VirtualHost>
-  </pre>
+    </VirtualHost>
 
 ## CLI debugging
 
 * If you would like to debug from CLI, start your php script like
 
-    <pre>
     php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009 test.php
-    </pre>
 
-* There is new command :Dp to debug current file. :Dp command is to launch current file with
+* There is new command `:Dp` to debug current file:
 
-    <pre>
     php -dxdebug.remote_autostart=1 -dxdebug.remote_port=9009
-    </pre>
 
 ## Python debugging
-DBGPavim is both a DBGP protocol server and VIM debugger backend, it can help to debug Python code.
-I haved tried it with --
+DBGPavim is both a DBGP protocol server and VIM debugger backend, so it can help to debug Python code.
+
+I haved tried it with:
+
 * Komodo Python Remote Debugging Client --Python 2.7 - MacVim 7.3 @ Mac OS X 10.8
 
 1. Download Komodo Python Remote Debugging Client from http://code.activestate.com/komodo/remotedebugging/, for Mac, it's Komodo-PythonRemoteDebugging-7.1.2-73175-macosx-x86.tar.gz (Refer to http://docs.activestate.com/komodo/4.4/debugpython.html)
