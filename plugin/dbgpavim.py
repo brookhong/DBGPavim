@@ -536,6 +536,7 @@ class DbgSessionWithUI(DbgSession):
     self.stacks     = []
     self.curstack   = 0
     self.laststack  = 0
+    self.last_command = 'None';
     DbgSession.__init__(self,sock)
   def copyFromParent(self, ss):
     self.latestRes = ss.latestRes
@@ -561,7 +562,8 @@ class DbgSessionWithUI(DbgSession):
       DbgSession.init(self)
       self.init()
       self.command('step_into')
-    self.command('property_get', "-d %d -n $_SERVER['REQUEST_URI']" % (self.laststack))
+    if dbgPavim.fileType == 'php':
+      self.command('property_get', "-d %d -n $_SERVER['REQUEST_URI']" % (self.laststack))
     self.ui.go_srcview()
   def send_msg(self, cmd):
     """ send message """
@@ -579,14 +581,13 @@ class DbgSessionWithUI(DbgSession):
       handler = getattr(self, 'handle_' + tag)
       handler(resDom)
     except AttributeError:
-      print 'DBGPavim.handle_'+tag+'() not found, please see the LOG___WINDOW'
+      print 'Exception when DBGPavim.handle_'+tag+'()'
+      dbgPavim.ui.trace(str(sys.exc_info()[1]))
+      dbgPavim.ui.trace("".join(traceback.format_tb( sys.exc_info()[2])))
     self.ui.go_srcview()
     return resDom
   def handle_response(self, res):
     """ call appropraite response message handler member function, handle_response_XXX() """
-    if res.get('reason') == 'error':
-      self.handle_response_error(res)
-      return
     errors  = res.find('{urn:debugger_protocol_v1}error')
     if errors != None:
       self.handle_response_error(res)
@@ -596,7 +597,9 @@ class DbgSessionWithUI(DbgSession):
     try:
       handler = getattr(self, 'handle_response_' + command)
     except AttributeError:
-      print 'DBGPavim.handle_response_'+command+'() not found, please see the LOG___WINDOW'
+      print 'Exception when DBGPavim.handle_response_'+command+'()'
+      dbgPavim.ui.trace(str(sys.exc_info()[1]))
+      dbgPavim.ui.trace("".join(traceback.format_tb( sys.exc_info()[2])))
       return
     handler(res)
     return
@@ -627,7 +630,10 @@ class DbgSessionWithUI(DbgSession):
   def handle_response_error(self, res):
     """ handle <error> tag """
     self.ui.trace(ET.tostring(res))
-    errors  = res.find('{urn:debugger_protocol_v1}error')
+    errors  = res.findall('{urn:debugger_protocol_v1}error')
+    for e in errors:
+      error_msg = e.find('{urn:debugger_protocol_v1}message')
+      self.ui.watchwin.write(self.ui.watchwin.commenter+'Error when '+self.last_command+': '+error_msg.text)
 
   def handle_response_stack_get(self, res):
     """handle <response command=stack_get> tag
@@ -729,6 +735,7 @@ class DbgSessionWithUI(DbgSession):
   def property_get(self, name = ''):
     if name == '':
       name = vim.eval('expand("<cword>")')
+    self.last_command = 'property_get '+name;
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
 
   def watch_execute(self):
@@ -924,14 +931,14 @@ class DBGPavim:
     vim.command("let &statusline=\""+sl+"\"")
 
   def loadSettings(self):
-    self.port = int(vim.eval('dbgPavimPort'))
-    self.dbgPavimKeyRun = vim.eval('dbgPavimKeyRun')
-    self.max_children = vim.eval('dbgPavimMaxChildren')
-    self.max_data = vim.eval('dbgPavimMaxData')
-    self.max_depth = vim.eval('dbgPavimMaxDepth')
-    self.break_at_entry = int(vim.eval('dbgPavimBreakAtEntry'))
-    self.show_context = int(vim.eval('dbgPavimShowContext'))
-    self.path_map = vim.eval('dbgPavimPathMap')
+    self.port = int(vim.eval('g:dbgPavimPort'))
+    self.dbgPavimKeyRun = vim.eval('g:dbgPavimKeyRun')
+    self.max_children = vim.eval('g:dbgPavimMaxChildren')
+    self.max_data = vim.eval('g:dbgPavimMaxData')
+    self.max_depth = vim.eval('g:dbgPavimMaxDepth')
+    self.break_at_entry = int(vim.eval('g:dbgPavimBreakAtEntry'))
+    self.show_context = int(vim.eval('g:dbgPavimShowContext'))
+    self.path_map = vim.eval('g:dbgPavimPathMap')
     for m in self.path_map:
       m[0] = m[0].replace("\\","/")
       m[1] = m[1].replace("\\","/")
@@ -948,15 +955,15 @@ class DBGPavim:
         return m[0]+rpath[l:]
     return rpath
   def setMaxChildren(self):
-    self.max_children = vim.eval('dbgPavimMaxChildren')
+    self.max_children = vim.eval('g:dbgPavimMaxChildren')
     if self.debugSession.sock != None:
       self.debugSession.command('feature_set', '-n max_children -v ' + self.max_children)
   def setMaxDepth(self):
-    self.max_depth = vim.eval('dbgPavimMaxDepth')
+    self.max_depth = vim.eval('g:dbgPavimMaxDepth')
     if self.debugSession.sock != None:
       self.debugSession.command('feature_set', '-n max_depth -v ' + self.max_depth)
   def setMaxData(self):
-    self.max_data = vim.eval('dbgPavimMaxData')
+    self.max_data = vim.eval('g:dbgPavimMaxData')
     if self.debugSession.sock != None:
       self.debugSession.command('feature_set', '-n max_data -v ' + self.max_data)
   def handle_exception(self):
@@ -984,6 +991,12 @@ class DBGPavim:
       else:
         self.ui.normal_mode()
     self.updateStatusLine()
+  def step(self):
+    self.debugSession.command('stack_get')
+    for var in self.watchList:
+      self.debugSession.command('property_get', "-d %d -n %s" % (self.debugSession.curstack, var))
+    if self.show_context:
+      self.debugSession.command('context_get', ('-d %d' % self.debugSession.curstack))
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:
@@ -991,11 +1004,7 @@ class DBGPavim:
       else:
         self.debugSession.command(msg, arg1, arg2)
         if self.debugSession.status != 'stopping':
-          self.debugSession.command('stack_get')
-          for var in self.watchList:
-            self.debugSession.command('property_get', "-d %d -n %s" % (self.debugSession.curstack, var))
-          if self.show_context:
-            self.debugSession.command('context_get', ('-d %d' % self.debugSession.curstack))
+          self.step()
         else:
           self.debugSession.command('stop')
     except:
@@ -1027,6 +1036,8 @@ class DBGPavim:
           name = "\"" + name +"\""
         elif name == 'this':
           name = '$this'
+        elif name == '%v%':
+          name = vim.eval('@v')
         self.debugSession.property_get(name)
     except:
       self.handle_exception()
@@ -1061,7 +1072,7 @@ class DBGPavim:
         if self.debugSession.status == 'stopping':
           self.debugSession.command("stop")
         elif self.debugSession.status != 'stopped':
-          self.debugSession.command("stack_get")
+          self.step()
       else:
         session = self.debugListener.nextSession()
         if session != None:

@@ -178,6 +178,7 @@ let s:keyMappings = {
 for key in keys(s:keyMappings)
   exec 'nnoremap <expr> <silent> '.key.' (exists("g:dbgPavimTab")==1 && g:dbgPavimTab == tabpagenr() ? "'.s:keyMappings[key].'" : "'.key.'")'
 endfor
+exec 'vnoremap '.g:dbgPavimKeyPropertyGet.' "vy:python dbgPavim.property("%v%")<CR>'
 command! -nargs=0 Up python dbgPavim.up()
 command! -nargs=0 Dn python dbgPavim.down()
 command! -nargs=? Pg python dbgPavim.property("<args>")
