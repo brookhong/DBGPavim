@@ -421,6 +421,7 @@ class DbgSession:
     self.isWinServer = 0
     self.bptsetlst  = {}
     self.bptsetids  = {}
+    self.last_command = 'None';
   def jump(self, fn, line):
     vim.command("e +"+str(line)+" "+str(fn))
   def handle_response_breakpoint_set(self, res):
@@ -505,6 +506,7 @@ class DbgSession:
         pass
   def command(self, cmd, arg1 = '', arg2 = ''):
     self.send_command(cmd, arg1, arg2)
+    self.last_command = cmd+'('+arg1+','+arg2+')';
     return self.ack_command()
   def close(self):
     if self.sock:
@@ -536,7 +538,6 @@ class DbgSessionWithUI(DbgSession):
     self.stacks     = []
     self.curstack   = 0
     self.laststack  = 0
-    self.last_command = 'None';
     DbgSession.__init__(self,sock)
   def copyFromParent(self, ss):
     self.latestRes = ss.latestRes
@@ -735,7 +736,6 @@ class DbgSessionWithUI(DbgSession):
   def property_get(self, name = ''):
     if name == '':
       name = vim.eval('expand("<cword>")')
-    self.last_command = 'property_get '+name;
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
 
   def watch_execute(self):
@@ -915,6 +915,7 @@ class DBGPavim:
     self.breakpt    = BreakPoint()
     self.ui         = DebugUI(12, 70)
     self.watchList  = []
+    self.evalList  = []
 
   def updateStatusLine(self):
     status = self.debugListener.status()
@@ -993,10 +994,12 @@ class DBGPavim:
     self.updateStatusLine()
   def step(self):
     self.debugSession.command('stack_get')
-    for var in self.watchList:
-      self.debugSession.command('property_get', "-d %d -n %s" % (self.debugSession.curstack, var))
     if self.show_context:
       self.debugSession.command('context_get', ('-d %d' % self.debugSession.curstack))
+    for var in self.watchList:
+      self.debugSession.command('property_get', "-d %d -n %s" % (self.debugSession.curstack, var))
+    for expr in self.evalList:
+      self.debugSession.command('eval', '', '$evalResult=(%s)' %(expr))
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:
@@ -1021,11 +1024,21 @@ class DBGPavim:
         self.watchList.remove(name)
       else:
         self.watchList.append(name)
+  def eval(self, name = ''):
+    if name == '':
+      print "Please follow an expression that you'd like to be evaluated automatically after each step."
+    else:
+      if name in self.evalList:
+        self.evalList.remove(name)
+      else:
+        self.evalList.append(name)
   def listWatch(self):
     if self.show_context:
       print '*CONTEXT*'
     for var in self.watchList:
       print var
+    for exp in self.evalList:
+      print exp+'(eval)'
   def property(self, name = ''):
     try:
       if self.debugSession.sock == None:

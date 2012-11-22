@@ -112,7 +112,7 @@ if !exists('g:dbgPavimPathMap')
   let g:dbgPavimPathMap = []
 endif
 if !exists('g:dbgPavimShowContext')
-  let g:dbgPavimShowContext = 1
+  let g:dbgPavimShowContext = 0
 endif
 if !exists('g:dbgPavimKeyRun')
   let g:dbgPavimKeyRun = '<F5>'
@@ -160,6 +160,7 @@ command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
 command! -nargs=? Dp python dbgPavim.cli('<args>')
 command! -nargs=? Wc python dbgPavim.watch("<args>")
+command! -nargs=? We python dbgPavim.eval("<args>")
 command! -nargs=0 Wl python dbgPavim.listWatch()
 command! -nargs=1 Children let g:dbgPavimMaxChildren=<args>|python dbgPavim.setMaxChildren()
 command! -nargs=1 Depth let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()

@@ -39,6 +39,7 @@ In normal mode
 
 
     :Wc [$foo] => to toggle watch on variable $foo, if no parameter is provided, it will toggle watch on CONTEXT.
+    :We [foo]  => to eval expression `foo` automatically after each step.
     :Wl        => to list all watched variables. By default, you can get output like *CONTEXT*, which means context are automatically populated each step in WATCH WINDOW.
 
 In debugging mode
