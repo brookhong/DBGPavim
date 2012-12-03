@@ -215,6 +215,8 @@ class WatchWindow(VimWindow):
     self.command('set noai nocin')
     self.command('set wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % (dbgPavim.fileType))
   def input(self, mode, arg = ''):
+    if arg == '%v%':
+      arg = vim.eval('@v')
     self.prepare()
     line = self.buffer[-1]
     if line[:len(mode)+1] == self.commenter+'=> '+mode+':':
@@ -733,9 +735,7 @@ class DbgSessionWithUI(DbgSession):
       self.ui.stackwin.highlight_stack(self.curstack)
       self.ui.set_srcview(self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'])
 
-  def property_get(self, name = ''):
-    if name == '':
-      name = vim.eval('expand("<cword>")')
+  def property_get(self, name):
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
 
   def watch_execute(self):
@@ -1044,13 +1044,15 @@ class DBGPavim:
       if self.debugSession.sock == None:
         print 'No debug session started.'
       else:
+        if name == '':
+          name = vim.eval('expand("<cword>")')
+        elif name == '%v%':
+          name = vim.eval('@v')
         string.replace(name,'"','\'')
         if string.find(name,' ') != -1:
           name = "\"" + name +"\""
-        elif name == 'this':
-          name = '$this'
-        elif name == '%v%':
-          name = vim.eval('@v')
+        if name[0] != '$':
+          name = '$'+name
         self.debugSession.property_get(name)
     except:
       self.handle_exception()
