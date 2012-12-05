@@ -172,7 +172,10 @@ class WatchWindow(VimWindow):
     if name == None:
       name = p.get('name')
       if command == 'eval':
-        name = "$evalResult" if (name == None) else ('$evalResult->%s'%(name))
+        if dbgPavim.fileType == 'php':
+          name = "$evalResult" if (name == None) else ('$evalResult->%s'%(name))
+        else:
+          name = "evalResult" if (name == None) else ('evalResult->%s'%(name))
       else:
         name = "" if (name == None) else name
     self.write('%s%s = %s;' % (" "*level,name.ljust(32-level), value))
@@ -210,7 +213,7 @@ class WatchWindow(VimWindow):
     if dbgPavim.fileType == 'php':
       self.write('<?')
     elif dbgPavim.fileType == 'python':
-      self.commenter = '# '
+      self.commenter = '## '
     self.command('inoremap <buffer> <cr> <esc>:python dbgPavim.debugSession.watch_execute()<cr>')
     self.command('set noai nocin')
     self.command('set wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % (dbgPavim.fileType))
@@ -507,6 +510,11 @@ class DbgSession:
       except:
         pass
   def command(self, cmd, arg1 = '', arg2 = ''):
+    if cmd == 'eval':
+      if dbgPavim.fileType == 'php':
+        arg2 = '$evalResult=(%s)' %(arg2)
+      else:
+        arg2 = 'evalResult=(%s)' %(arg2)
     self.send_command(cmd, arg1, arg2)
     self.last_command = cmd+'('+arg1+','+arg2+')';
     return self.ack_command()
@@ -745,7 +753,6 @@ class DbgSessionWithUI(DbgSession):
       self.command('exec', '', expr)
       print cmd, '--', expr
     elif cmd == 'eval':
-      self.command('eval', '', '$evalResult=(%s)' %(expr))
       print cmd, '--', expr
     else:
       print "no commands", cmd, expr
@@ -999,7 +1006,7 @@ class DBGPavim:
     for var in self.watchList:
       self.debugSession.command('property_get', "-d %d -n %s" % (self.debugSession.curstack, var))
     for expr in self.evalList:
-      self.debugSession.command('eval', '', '$evalResult=(%s)' %(expr))
+      self.debugSession.command('eval', '', expr)
   def command(self, msg, arg1 = '', arg2 = ''):
     try:
       if self.debugSession.sock == None:
@@ -1051,7 +1058,7 @@ class DBGPavim:
         string.replace(name,'"','\'')
         if string.find(name,' ') != -1:
           name = "\"" + name +"\""
-        if name[0] != '$':
+        if self.fileType == 'php' and name[0] != '$':
           name = '$'+name
         self.debugSession.property_get(name)
     except:
