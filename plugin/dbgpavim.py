@@ -163,11 +163,14 @@ class WatchWindow(VimWindow):
     return value
   def write_property1(self, p, level, command = None):
     size = p.get('size')
+    tp = p.get('type')
     size = ('[%s]' % (size)) if size != None else ""
     if p.text != None:
-      value = "(%s%s) '%s'" % (p.get('type'), size, self.decode_string(p.text, p.get('encoding')))
+      value = "(%s%s) '%s'" % (tp, size, self.decode_string(p.text, p.get('encoding')))
+    elif tp == "null":
+      value = "(null)"
     else:
-      value = "(%s%s)+" % (p.get('type'), size)
+      value = "(%s%s)+" % (tp, size)
     name = p.get('fullname')
     if name == None:
       name = p.get('name')
@@ -187,11 +190,14 @@ class WatchWindow(VimWindow):
     fullname = self.decode_string(fullname_node.text, fullname_node.get('encoding'))
     value_node = p.find('{urn:debugger_protocol_v1}value')
     size = p.get('size')
+    tp = p.get('type')
     size = ('[%s]' % (size)) if size != None else ""
     if value_node != None and value_node.text != None:
-      value = "(%s%s) '%s'" % (p.get('type'), size, self.decode_string(value_node.text, value_node.get('encoding')))
+      value = "(%s%s) '%s'" % (tp, size, self.decode_string(value_node.text, value_node.get('encoding')))
+    elif tp == "null":
+      value = "(null)"
     else:
-      value = "(%s%s)+" % (p.get('type'), size)
+      value = "(%s%s)+" % (tp, size)
     self.write('%s%s = %s;' % (" "*level, fullname.ljust(32-level), value))
     properties = p.findall('{urn:debugger_protocol_v1}property')
     for pp in properties:
@@ -1106,7 +1112,6 @@ class DBGPavim:
   def cli(self, args):
     vim.command("let g:dbgPavimBreakAtEntry=1")
     self.ui.cliwin = ConsoleWindow(self.ui.clilog)
-    self.run()
     filetype = vim.eval('&filetype')
     filename = vim.eval('expand("%")')
     if filename:
@@ -1118,10 +1123,11 @@ class DBGPavim:
         if vim.eval('CheckPydbgp()') == '0':
           cmd = 'pydbgp -u -d '+str(self.port)+cmd
       if cmd[0] != ' ':
+        self.run()
         ar = AsyncRunner(cmd, self.ui.clilog)
         ar.start()
         time.sleep(0.4)
-        vim.eval('feedkeys("\\'+self.dbgPavimKeyRun+'")')
+        #vim.eval('feedkeys("\\'+self.dbgPavimKeyRun+'")')
       else:
         print "Only python and php file debugging are integrated for now."
     else:
