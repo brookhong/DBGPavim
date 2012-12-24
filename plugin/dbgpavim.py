@@ -284,7 +284,6 @@ class DebugUI:
     self.stackwinHeight = stackwinHeight
     self.watchwinWidth  = watchwinWidth
     self.tracelog       = open(os.getenv("HOME").replace("\\","/")+"/.dbgpavim.trace",'w')
-    #self.tracelog       = open(os.devnull,'w')
     self.helpwin        = None
     self.mode           = DebugUI.NORMAL
     self.file           = None
@@ -759,6 +758,7 @@ class DbgSessionWithUI(DbgSession):
       self.command('exec', '', expr)
       print cmd, '--', expr
     elif cmd == 'eval':
+      self.command('eval', '', expr)
       print cmd, '--', expr
     else:
       print "no commands", cmd, expr
@@ -924,7 +924,7 @@ class DBGPavim:
     vim.command('sign unplace *')
 
     self.normal_statusline = vim.eval('&statusline')
-    self.statusline="%<%f\ %h%m%r\ %=%-10.(%l,%c%V%)\ %P\ %=%{'PHP-'}%{(g:dbgPavimBreakAtEntry==1)?'bae':'bap'}"
+    self.statusline="%<%f\ %h%m%r\ %=%-10.(%l,%c%V%)\ %P\ %=%{(g:dbgPavimBreakAtEntry==1)?'bae':'bap'}"
     self.breakpt    = BreakPoint()
     self.ui         = DebugUI(12, 70)
     self.watchList  = []
@@ -937,11 +937,11 @@ class DBGPavim:
     else:
       c = self.debugListener.pendingCount()
       if c > 0:
-        sl = self.statusline+"%{'-PEND"+str(c)+"'}"
+        sl = self.statusline+"%{'-PEND-"+str(c)+"'}"
       elif self.debugSession.sock != None:
         sl = self.statusline+"%{'-CONN'}"
       else:
-        sl = self.statusline+"%{'-LISN'}"
+        sl = self.statusline+"%{'-LISN-"+str(self.port)+"'}"
     vim.command("let &statusline=\""+sl+"\"")
 
   def loadSettings(self):
