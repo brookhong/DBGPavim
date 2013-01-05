@@ -244,6 +244,24 @@ function! CheckXdebug()
   endif
   return l:ret
 endfunction
+function! Signs()
+  let l:signs = ''
+  redir => l:signs
+  silent exec 'sign place buffer='.bufnr('%')
+  redir END
+  let l:bpts = {}
+  let l:lines = split(l:signs, '\n')
+  for l:line in l:lines
+    if l:line =~ "^Signs for \\S*:$"
+      let l:file = expand("%:p")
+    elseif l:line =~ "^\\s*line=\\d*\\s*id=\\d*\\s*name=breakpt$"
+      let l:lno = substitute(l:line,"^\\s*line=\\(\\d\\+\\)\\s*id=\\d*\\s*name=breakpt$", "\\1", "g")
+      let l:id = substitute(l:line,"^\\s*line=\\d\\+\\s*id=\\(\\d\\+\\)\\s*name=breakpt$", "\\1", "g")
+      let l:bpts[l:id] = [l:file, l:lno]
+    endif
+  endfor
+  return l:bpts
+endfunction
 
 hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
 hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse

@@ -886,8 +886,12 @@ class BreakPoint:
     del self.dictionaries[bno]
   def find(self, file, line):
     """ find break point and return bno(breakpoint number) """
-    for bno in self.dictionaries.keys():
-      if self.dictionaries[bno]['file'] == file and self.dictionaries[bno]['line'] == line:
+    signs = vim.eval('Signs()')
+    for k in signs.keys():
+      if signs[k][0] == file and signs[k][1] == line:
+        bno = int(k)
+        self.dictionaries[bno]['file'] = file
+        self.dictionaries[bno]['line'] = line
         return bno
     return None
   def getfile(self, bno):
@@ -1134,15 +1138,16 @@ class DBGPavim:
       print "You need open one python or php file first."
 
   def list(self):
-    self.ui.watchwin.write(self.ui.watchwin.commenter+'breakpoints list: ')
+    vim.command("lgetexpr []")
     for bno in self.breakpt.list():
-      self.ui.watchwin.write(str(bno)+'  ' + self.breakpt.getfile(bno) + ':' + str(self.breakpt.getline(bno)))
+      vim.command("lad '"+self.breakpt.getfile(bno)+":"+str(self.breakpt.getline(bno))+":1'")
+    vim.command("lw")
 
   def mark(self, exp = ''):
     (row, rol) = vim.current.window.cursor
     file       = vim.current.buffer.name
 
-    bno = self.breakpt.find(file, row)
+    bno = self.breakpt.find(file, str(row))
     if bno != None:
       self.breakpt.remove(bno)
       vim.command('sign unplace ' + str(bno))
