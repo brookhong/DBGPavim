@@ -2,7 +2,7 @@
 # -*- c--oding: ko_KR.UTF-8 -*-
 # remote PHP debugger : remote debugger interface to DBGp protocol
 #
-# Copyright (c) 2012 Brook Hong
+# Copyright (c) 2012-2013 Brook Hong
 #
 # The MIT License
 #
@@ -81,15 +81,19 @@ class VimWindow:
     return int(vim.eval("winwidth(bufwinnr('"+self.name+"'))"))
   def getHeight(self):
     return int(vim.eval("winheight(bufwinnr('"+self.name+"'))"))
-  def write(self, msg):
+  def write(self, msg, lineno = 0):
     """ append last """
     self.prepare()
     if self.firstwrite == 1:
       self.firstwrite = 0
       self.buffer[:] = str(msg).split('\n')
     else:
-      self.buffer.append(str(msg).split('\n'))
-    self.command('normal G')
+      if lineno == 0:
+        self.buffer.append(str(msg).split('\n'))
+        self.command('normal G')
+      else:
+        self.buffer.append(str(msg).split('\n'), lineno)
+        self.command("normal %dG" % (lineno+1))
     #self.window.cursor = (len(self.buffer), 1)
   def create(self, method = 'new'):
     """ create window """
@@ -161,16 +165,20 @@ class WatchWindow(VimWindow):
     else:
       value = "(e:%s) %s" % (encoding, p.text)
     return value
-  def write_property1(self, p, level, command = None):
+  def parseProperty1(self, p, level, command = None):
     size = p.get('size')
     tp = p.get('type')
+    properties = p.findall('{urn:debugger_protocol_v1}property')
     size = ('[%s]' % (size)) if size != None else ""
     if p.text != None:
       value = "(%s%s) '%s'" % (tp, size, self.decode_string(p.text, p.get('encoding')))
     elif tp == "null":
       value = "(null)"
     else:
-      value = "(%s%s)+" % (tp, size)
+      if len(properties) == 0:
+        value = "(%s%s)+" % (tp, size)
+      else:
+        value = "(%s%s)" % (tp, size)
     name = p.get('fullname')
     if name == None:
       name = p.get('name')
@@ -181,39 +189,49 @@ class WatchWindow(VimWindow):
           name = "evalResult" if (name == None) else ('evalResult->%s'%(name))
       else:
         name = "" if (name == None) else name
-    self.write('%s%s = %s;' % (" "*level,name.ljust(32-level), value))
-    properties = p.findall('{urn:debugger_protocol_v1}property')
+    out = ('%s%s = %s;' % (" "*level,name.ljust(32-level), value))
     for pp in properties:
-      self.write_property1(pp, level+2, command)
-  def write_property2(self, p, level, command = None):
+      out += '\n'+self.parseProperty1(pp, level+2, command)
+    return out
+  def parseProperty2(self, p, level, command = None):
     fullname_node = p.find('{urn:debugger_protocol_v1}fullname')
     fullname = self.decode_string(fullname_node.text, fullname_node.get('encoding'))
     value_node = p.find('{urn:debugger_protocol_v1}value')
     size = p.get('size')
     tp = p.get('type')
+    properties = p.findall('{urn:debugger_protocol_v1}property')
     size = ('[%s]' % (size)) if size != None else ""
     if value_node != None and value_node.text != None:
       value = "(%s%s) '%s'" % (tp, size, self.decode_string(value_node.text, value_node.get('encoding')))
     elif tp == "null":
       value = "(null)"
     else:
-      value = "(%s%s)+" % (tp, size)
-    self.write('%s%s = %s;' % (" "*level, fullname.ljust(32-level), value))
-    properties = p.findall('{urn:debugger_protocol_v1}property')
+      if len(properties) == 0:
+        value = "(%s%s)+" % (tp, size)
+      else:
+        value = "(%s%s)" % (tp, size)
+    out = ('%s%s = %s;' % (" "*level, fullname.ljust(32-level), value))
     for pp in properties:
-      self.write_property2(pp, level+2, command)
-  def render(self, xml, level = 0):
+      out += '\n'+self.parseProperty2(pp, level+2, command)
+    return out
+  def render(self, xml, lineno = 0):
     command = xml.get('command')
-    if command != None and command != 'eval':
-      self.write(self.commenter+"by "+xml.get('command'))
+    level = 0
+    out = ""
+    if lineno > 0:
+      line = self.buffer[lineno-1]
+      del self.buffer[lineno-1]
+      lineno -= 1
+      level = len(line)-len(line.lstrip())
+    elif command != None and command != 'eval':
+      out += ("\n%sby %s\n" % (self.commenter, xml.get('command')))
     properties = xml.findall('{urn:debugger_protocol_v1}property')
     for p in properties:
       if p.find('{urn:debugger_protocol_v1}fullname') != None:
-        self.write_property2(p, level, command)
+        out += self.parseProperty2(p, level, command)
       else:
-        self.write_property1(p, level, command)
-    if level == 0:
-      self.write("\n")
+        out += self.parseProperty1(p, level, command)
+    self.write(out, lineno)
   def on_create(self):
     self.commenter = '// '
     if dbgPavim.fileType == 'php':
@@ -514,15 +532,21 @@ class DbgSession:
           return resDom
       except:
         pass
-  def command(self, cmd, arg1 = '', arg2 = ''):
+  def command(self, cmd, arg1 = '', arg2 = '', extra = '0'):
     if cmd == 'eval':
       if dbgPavim.fileType == 'php':
         arg2 = '$evalResult=(%s)' %(arg2)
       else:
         arg2 = 'evalResult=(%s)' %(arg2)
     self.send_command(cmd, arg1, arg2)
-    self.last_command = cmd+'('+arg1+','+arg2+')';
+    self.last_command = cmd+'('+arg1+','+arg2+','+extra+')';
     return self.ack_command()
+  def getExtra(self):
+    extra = ""
+    if self.last_command != None:
+      t = self.last_command.split(',')
+      extra = t[-1][:-1]
+    return extra
   def close(self):
     if self.sock:
       self.sock.close()
@@ -716,7 +740,8 @@ class DbgSessionWithUI(DbgSession):
     self.ui.watchwin.render(res)
   def handle_response_property_get(self, res):
     """handle <response command=property_get> tag """
-    self.ui.watchwin.render(res)
+    lineno = self.getExtra()
+    self.ui.watchwin.render(res, int(lineno))
   def handle_response_context_get(self, res):
     """handle <response command=context_get> tag """
     self.ui.watchwin.render(res)
@@ -750,6 +775,10 @@ class DbgSessionWithUI(DbgSession):
 
   def property_get(self, name):
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
+
+  def expandVar(self, name):
+    (row, col) = vim.current.window.cursor
+    self.command('property_get', '-d %d -n %s' % (self.curstack,  name), '', str(row))
 
   def watch_execute(self):
     """ execute command in watch window """
@@ -1144,7 +1173,7 @@ class DBGPavim:
     vim.command("lw")
 
   def mark(self, exp = ''):
-    (row, rol) = vim.current.window.cursor
+    (row, col) = vim.current.window.cursor
     file       = vim.current.buffer.name
 
     bno = self.breakpt.find(file, str(row))
@@ -1153,8 +1182,7 @@ class DBGPavim:
       vim.command('sign unplace ' + str(bno))
       id = self.debugSession.getbid(bno)
       if self.debugSession.sock != None and id != None:
-        self.debugSession.send_command('breakpoint_remove', '-d ' + str(id))
-        self.debugSession.ack_command()
+        self.debugSession.command('breakpoint_remove', '-d ' + str(id))
     else:
       bno = self.breakpt.add(file, row, exp)
       vim.command('sign place ' + str(bno) + ' name=breakpt line=' + str(row) + ' file=' + file)

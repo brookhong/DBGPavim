@@ -200,7 +200,7 @@ endfunction
 function! WatchWindowOnEnter()
   let l:line = getline(".")
   if l:line =~ "^\\s*.* = (.*)+;$"
-    execute "Pg ".substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")
+    execute "python dbgPavim.debugSession.expandVar('".substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")."')"
     execute "normal \<c-w>p"
   elseif l:line =~ "^\\d\\+  .*:\\d\\+$"
     let fn = substitute(l:line,"^\\d\\+  \\(.*\\):\\d\\+$","\\1","")
