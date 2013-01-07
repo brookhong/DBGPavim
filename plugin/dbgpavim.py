@@ -168,6 +168,7 @@ class WatchWindow(VimWindow):
   def parseProperty1(self, p, level, command = None):
     size = p.get('size')
     tp = p.get('type')
+    children = p.get('children')
     properties = p.findall('{urn:debugger_protocol_v1}property')
     size = ('[%s]' % (size)) if size != None else ""
     if p.text != None:
@@ -175,7 +176,7 @@ class WatchWindow(VimWindow):
     elif tp == "null":
       value = "(null)"
     else:
-      if len(properties) == 0:
+      if children == "1" and len(properties) == 0:
         value = "(%s%s)+" % (tp, size)
       else:
         value = "(%s%s)" % (tp, size)
@@ -199,6 +200,7 @@ class WatchWindow(VimWindow):
     value_node = p.find('{urn:debugger_protocol_v1}value')
     size = p.get('size')
     tp = p.get('type')
+    children = p.get('children')
     properties = p.findall('{urn:debugger_protocol_v1}property')
     size = ('[%s]' % (size)) if size != None else ""
     if value_node != None and value_node.text != None:
@@ -206,7 +208,7 @@ class WatchWindow(VimWindow):
     elif tp == "null":
       value = "(null)"
     else:
-      if len(properties) == 0:
+      if children == "1" and len(properties) == 0:
         value = "(%s%s)+" % (tp, size)
       else:
         value = "(%s%s)" % (tp, size)
