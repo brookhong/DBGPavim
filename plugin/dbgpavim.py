@@ -170,46 +170,38 @@ class WatchWindow(VimWindow):
     else:
       value = "(e:%s) %s" % (encoding, p.text)
     return value
-  def parseProperty1(self, p, level, command = None):
-    size = p.get('size')
-    tp = p.get('type')
-    children = p.get('children')
-    properties = p.findall('{urn:debugger_protocol_v1}property')
-    size = ('[%s]' % (size)) if size != None else ""
+  def parseNode1(self, p):
+    fullname = p.get('fullname')
+    if fullname == None:
+      fullname = p.get('name')
+    val = None
     if p.text != None:
-      value = "(%s%s) '%s'" % (tp, size, self.decode_string(p.text, p.get('encoding')))
-    elif tp == "null":
-      value = "(null)"
-    else:
-      if children == "1" and len(properties) == 0:
-        value = "(%s%s)+" % (tp, size)
-      else:
-        value = "(%s%s)" % (tp, size)
-    name = p.get('fullname')
-    if name == None:
-      name = p.get('name')
-      if command == 'eval':
-        if dbgPavim.fileType == 'php':
-          name = "$evalResult" if (name == None) else ('$evalResult->%s'%(name))
-        else:
-          name = "evalResult" if (name == None) else ('evalResult->%s'%(name))
-      else:
-        name = "" if (name == None) else name
-    out = ('%s%s = %s;' % (" "*level,name.ljust(32-level), value))
-    for pp in properties:
-      out += '\n'+self.parseProperty1(pp, level+2, command)
-    return out
-  def parseProperty2(self, p, level, command = None):
+      val = self.decode_string(p.text, p.get('encoding'))
+    return (fullname, val)
+  def parseNode2(self, p):
     fullname_node = p.find('{urn:debugger_protocol_v1}fullname')
     fullname = self.decode_string(fullname_node.text, fullname_node.get('encoding'))
     value_node = p.find('{urn:debugger_protocol_v1}value')
+    val = None
+    if value_node != None and value_node.text != None:
+      val = self.decode_string(value_node.text, value_node.get('encoding'))
+    return (fullname, val)
+  def parseProperty(self, p, level, parser, command = None):
+    (fullname, val) = parser(p)
+    if command == 'eval':
+      if dbgPavim.fileType == 'php':
+        fullname = "$evalResult" if (fullname == None) else ('$evalResult->%s'%(fullname))
+      else:
+        fullname = "evalResult" if (fullname == None) else ('evalResult->%s'%(fullname))
+    else:
+      fullname = "" if (fullname == None) else fullname
     size = p.get('size')
     tp = p.get('type')
     children = p.get('children')
     properties = p.findall('{urn:debugger_protocol_v1}property')
     size = ('[%s]' % (size)) if size != None else ""
-    if value_node != None and value_node.text != None:
-      value = "(%s%s) '%s'" % (tp, size, self.decode_string(value_node.text, value_node.get('encoding')))
+    if val != None:
+      value = "(%s%s) '%s'" % (tp, size, val)
     elif tp == "null":
       value = "(null)"
     else:
@@ -219,7 +211,7 @@ class WatchWindow(VimWindow):
         value = "(%s%s)" % (tp, size)
     out = ('%s%s = %s;' % (" "*level, fullname.ljust(32-level), value))
     for pp in properties:
-      out += '\n'+self.parseProperty2(pp, level+2, command)
+      out += '\n'+self.parseProperty(pp, level+2, parser, command)
     return out
   def render(self, xml, lineno = 0):
     command = xml.get('command')
@@ -233,11 +225,12 @@ class WatchWindow(VimWindow):
     elif command != None and command != 'eval':
       out += ("\n%sby %s\n" % (self.commenter, xml.get('command')))
     properties = xml.findall('{urn:debugger_protocol_v1}property')
+    if properties[0].find('{urn:debugger_protocol_v1}fullname') != None:
+      parser = getattr(self, 'parseNode2')
+    else:
+      parser = getattr(self, 'parseNode1')
     for p in properties:
-      if p.find('{urn:debugger_protocol_v1}fullname') != None:
-        out += self.parseProperty2(p, level, command)
-      else:
-        out += self.parseProperty1(p, level, command)
+      out += self.parseProperty(p, level, parser, command)
       if lineno == 0:
         out += "\n"
     self.write(out, lineno)

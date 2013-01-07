@@ -34,7 +34,7 @@ In normal mode
     <F10>     => toggle breakpoint at current line
 
     :Bl        => to list all breakpoints
-    :Bp        => toggle breakpoint on current line
+    :Bp [expr] => toggle breakpoint on current line, if expr is provided, that is conditional breakpoint, for example, `:Bp ($i > 3)` only breaks when $i is larger than 3.
     :Dp [args] => to debug current file from CLI, it will run 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port=<your_port> <curret_file_in_vim> [args]'
 
 
