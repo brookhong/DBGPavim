@@ -51,6 +51,11 @@ def getFilePath(s):
     fn = fn[1:]
     win = 1
   return [fn, win]
+tracelog = open(os.getenv("HOME").replace("\\","/")+"/.dbgpavim.trace",'w')
+def DBGPavimTrace(log):
+  tracelog.write("\n"+log+"\n")
+  tracelog.flush()
+
 class VimWindow:
   """ wrapper class of window of vim """
   def __init__(self, name = 'DEBUG_WINDOW'):
@@ -233,6 +238,8 @@ class WatchWindow(VimWindow):
         out += self.parseProperty2(p, level, command)
       else:
         out += self.parseProperty1(p, level, command)
+      if lineno == 0:
+        out += "\n"
     self.write(out, lineno)
   def on_create(self):
     self.commenter = '// '
@@ -303,7 +310,6 @@ class DebugUI:
     self.stackwin       = StackWindow()
     self.stackwinHeight = stackwinHeight
     self.watchwinWidth  = watchwinWidth
-    self.tracelog       = open(os.getenv("HOME").replace("\\","/")+"/.dbgpavim.trace",'w')
     self.helpwin        = None
     self.mode           = DebugUI.NORMAL
     self.file           = None
@@ -314,11 +320,6 @@ class DebugUI:
     self.clilog         = os.getenv("HOME").replace("\\","/")+"/.dbgpavim.cli"
     self.cliwin         = None
     self.backup_ssop    = vim.eval('&ssop')
-
-  def trace(self, log = None):
-    if log != None:
-      self.tracelog.write("\n"+log+"\n")
-      self.tracelog.flush()
 
   def debug_mode(self):
     """ change mode to debug """
@@ -502,10 +503,10 @@ class DbgSession:
     self.recv_null()
     return body
   def send_msg(self, cmd):
-    dbgPavim.ui.trace(str(self.msgid)+">"*16+"\n"+cmd)
+    DBGPavimTrace(str(self.msgid)+">"*16+"\n"+cmd)
     self.sock.send(cmd + '\0')
   def handle_recvd_msg(self, res):
-    dbgPavim.ui.trace(str(self.msgid)+"<"*16+"\n"+res)
+    DBGPavimTrace(str(self.msgid)+"<"*16+"\n"+res)
     resDom = ET.fromstring(res)
     if resDom.tag == "response":
       if resDom.get('command') == "breakpoint_set":
@@ -611,11 +612,11 @@ class DbgSessionWithUI(DbgSession):
     """ send message """
     self.sock.send(cmd + '\0')
     # log message
-    dbgPavim.ui.trace(str(self.msgid)+">"*16+"\n"+cmd)
+    DBGPavimTrace(str(self.msgid)+">"*16+"\n"+cmd)
   def handle_recvd_msg(self, txt):
     # log messages
     txt = txt.replace('\n','')
-    dbgPavim.ui.trace(str(self.msgid)+"<"*16+"\n"+txt)
+    DBGPavimTrace(str(self.msgid)+"<"*16+"\n"+txt)
     resDom = ET.fromstring(txt)
     tag = resDom.tag.replace("{urn:debugger_protocol_v1}","")
     """ call appropraite message handler member function, handle_XXX() """
@@ -624,8 +625,8 @@ class DbgSessionWithUI(DbgSession):
       handler(resDom)
     except AttributeError:
       print 'Exception when DBGPavim.handle_'+tag+'()'
-      dbgPavim.ui.trace(str(sys.exc_info()[1]))
-      dbgPavim.ui.trace("".join(traceback.format_tb( sys.exc_info()[2])))
+      DBGPavimTrace(str(sys.exc_info()[1]))
+      DBGPavimTrace("".join(traceback.format_tb( sys.exc_info()[2])))
     self.ui.go_srcview()
     return resDom
   def handle_response(self, res):
@@ -640,8 +641,8 @@ class DbgSessionWithUI(DbgSession):
       handler = getattr(self, 'handle_response_' + command)
     except AttributeError:
       print 'Exception when DBGPavim.handle_response_'+command+'()'
-      dbgPavim.ui.trace(str(sys.exc_info()[1]))
-      dbgPavim.ui.trace("".join(traceback.format_tb( sys.exc_info()[2])))
+      DBGPavimTrace(str(sys.exc_info()[1]))
+      DBGPavimTrace("".join(traceback.format_tb( sys.exc_info()[2])))
       return
     handler(res)
     return
@@ -671,7 +672,7 @@ class DbgSessionWithUI(DbgSession):
 
   def handle_response_error(self, res):
     """ handle <error> tag """
-    self.ui.trace(ET.tostring(res))
+    DBGPavimTrace(ET.tostring(res))
     errors  = res.findall('{urn:debugger_protocol_v1}error')
     for e in errors:
       error_msg = e.find('{urn:debugger_protocol_v1}message')
@@ -885,6 +886,7 @@ class DbgListener(Thread):
     self.lock.release()
     while 1:
       (sock, address) = serv.accept()
+      DBGPavimTrace('# Connection from %s:%d\n' % (address[0], address[1]))
       s = self.status()
       if s == self.LISTEN:
         if dbgPavim.break_at_entry:
@@ -1016,8 +1018,8 @@ class DBGPavim:
     if self.debugSession.sock != None:
       self.debugSession.command('feature_set', '-n max_data -v ' + self.max_data)
   def handle_exception(self):
-    self.ui.trace(str(sys.exc_info()[1]))
-    self.ui.trace("".join(traceback.format_tb( sys.exc_info()[2])))
+    DBGPavimTrace(str(sys.exc_info()[1]))
+    DBGPavimTrace("".join(traceback.format_tb( sys.exc_info()[2])))
     errno = sys.exc_info()[0]
 
     session = self.debugListener.nextSession()
