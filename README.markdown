@@ -6,7 +6,7 @@ Tested with:
 * XDebug 2.2 - PHP 5.4 - GVIM 7.3 - Python 2.7 @ Windows 7
 * XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
 * XDebug 2.2 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
-* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux (Only early version of this plugin works with pytho2.3)
+* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux (Only early version of this plugin works with python2.3)
 
 Screen shot
 ----------
@@ -21,7 +21,7 @@ More at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdeb
 ## Enhancements
 
 ### Non blocking debugger backend.
-So that VIM users do not need to wait for connection from server. No timeouts; users press F5 to start debugger backend and use VIM normally. Debug backend won't stop users from interacting with VIM. Users can press F6 to stop debugger backend at any time.
+So that VIM users do not need to wait for connection from server. No timeouts; users press `F5` to start debugger backend and use VIM normally. Debug backend won't stop users from interacting with VIM. Users can press `F6` to stop debugger backend at any time.
 
 ### Catch all connections from apache server.
 This is very important for a large website, especially for pages that contain AJAX requests. In that case, one reload of a page may trigger dozens of HTTP requests, each of them going to a different URL. The new debugger backend will catch all connections from the server.
@@ -58,7 +58,7 @@ In debugging mode
     <F4>      => step out
     <F5>      => start debugging / run
     <F6>      => stop debugging
-    <F7>      => evalute expression and display result. cursor is automatically move to watch window. type line and just press enter.
+    <F7>      => evalute expression and display result. cursor is automatically move to watch window. type line and just press `Enter`.
     <F9>      => toggle layout
     <F11>     => shows all variables
     <F12>     => shows variable on current cursor
@@ -81,23 +81,24 @@ You can define your own key mappings as below:
 
 In Watch window
 
-    If you press Enter key at a line which ends with plus to expand it.
+    If you press `Enter` at a line which ends with plus to expand it.
 
-    If you press Enter key at a line of output from command :Bl, that breakpoint will be located.
+    If you press `Enter` at a line of output from command `:Bl`, that breakpoint will be located.
 
 In Stack window
 
-    If you press Enter key at a line, stack level will be set.
+    If you press `Enter` at a line, stack level will be set.
 
 ### Windows Support
 
 ### Status line for debugger backend
 
-After user press <F5> to start debugger backend, a string like "PHP-bae-LISN" will show up at the right side of status line.
+After user press `F5` to start debugger backend, a string like "bap-LISN-9000" will show up at the right side of status line.
+Here `9000` is the listening port of debugger, which is set by g:dbgPavimPort.
 
 The status string looks like:
 
-    PHP-<bae|bap>-<LISN|PENDn|CONN|CLSD>
+    <bae|bap>-<LISN|PENDn|CONN|CLSD>
 
     bae       => means Break At Entry
     bap       => means Break only At breakPoints
@@ -131,8 +132,10 @@ If your VIM doesn't support python, download VIM source package from http://www.
 
 * Install xdebug for php, and edit php.ini
 
+    <pre>
     zend_extension=path_to_xdebug.so
     xdebug.remote_enable=1
+    </pre>
 
 * Edit your ~/.vimrc
 
@@ -151,7 +154,7 @@ In your VirtualHost section, set debugger port same as the one in your vimrc:
 
 * Open your php file, use :Bp to set breakpoints
 
-* Now, press F5 to start debugger backend
+* Now, press `F5` to start debugger backend
 
 * Back to your browser, add XDEBUG_SESSION_START=1 to your URL, for example, http://localhost/index.php?XDEBUG_SESSION_START=1.
 
