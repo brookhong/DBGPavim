@@ -5,10 +5,18 @@ Tested with:
 
 * XDebug 2.2 - PHP 5.4 - GVIM 7.3 - Python 2.7 @ Windows 7
 * XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
-* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux
 * XDebug 2.2 - PHP 5.2 - VIM 7.3  - Python 2.7 @ Linux
+* XDebug 2.0 - PHP 5.2 - VIM 7.3  - Python 2.3 @ Linux (Only early version of this plugin works with pytho2.3)
 
-Some screenshots (under Windows 7) are here: http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
+Screen shot
+----------
+Debugging PHP
+![DBGPavim-php](http://sharing-from-brook.16002.n6.nabble.com/file/n4930670/debug_mode1.png)
+Debugging Python
+![DBGPavim-python](http://sharing-from-brook.16002.n6.nabble.com/file/n4930670/py.png)
+
+More at http://sharing-from-brook.16002.n6.nabble.com/Debug-php-in-VIM-with-Xdebug-and-DBGPavim-td4930670.html.
+
 
 ## Enhancements
 
@@ -73,10 +81,7 @@ You can define your own key mappings as below:
 
 In Watch window
 
-    If you press Enter key at a line which ends with --
-
-    (object)  => to get value of an object.
-    (array)   => to get value of an array.
+    If you press Enter key at a line which ends with plus to expand it.
 
     If you press Enter key at a line of output from command :Bl, that breakpoint will be located.
 
