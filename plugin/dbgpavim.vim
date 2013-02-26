@@ -108,6 +108,9 @@ endif
 if !exists('g:dbgPavimBreakAtEntry')
   let g:dbgPavimBreakAtEntry = 0
 endif
+if !exists('g:dbgPavimOnce')
+  let g:dbgPavimOnce = 0
+endif
 if !exists('g:dbgPavimPathMap')
   let g:dbgPavimPathMap = []
 endif
@@ -195,7 +198,7 @@ function! ResizeWindow(flag)
 endfunction
 function! Bae()
   let g:dbgPavimBreakAtEntry = (g:dbgPavimBreakAtEntry == 1) ? 0 : 1
-  execute 'python dbgPavim.break_at_entry = '.g:dbgPavimBreakAtEntry
+  execute 'python dbgPavim.breakAtEntry = '.g:dbgPavimBreakAtEntry
 endfunction
 function! WatchWindowOnEnter()
   let l:line = getline(".")

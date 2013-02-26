@@ -582,9 +582,9 @@ class DbgSessionWithUI(DbgSession):
     self.bptsetlst  = ss.bptsetlst
     self.bptsetids  = ss.bptsetids
   def init(self):
-    self.command('feature_set', '-n max_children -v ' + dbgPavim.max_children)
-    self.command('feature_set', '-n max_data -v ' + dbgPavim.max_data)
-    self.command('feature_set', '-n max_depth -v ' + dbgPavim.max_depth)
+    self.command('feature_set', '-n max_children -v ' + dbgPavim.maxChildren)
+    self.command('feature_set', '-n max_data -v ' + dbgPavim.maxData)
+    self.command('feature_set', '-n max_depth -v ' + dbgPavim.maxDepth)
   def start(self):
     self.sock.settimeout(30)
     dbgPavim.updateStatusLine()
@@ -804,12 +804,12 @@ class DbgSilentClient(Thread):
       dbgPavim.debugListener.newSession(self.session)
 
 class DbgListener(Thread):
-  (INIT,LISTEN,CLOSED) = (0,1,2)
+  (LISTEN,CLOSED) = (0,1)
   """ DBGp Procotol class """
   def __init__(self, port):
     self.port     = port
     self.session_queue = []
-    self._status  = self.INIT
+    self._status  = self.CLOSED
     self.lock = Lock()
     Thread.__init__(self)
   def start(self):
@@ -831,6 +831,8 @@ class DbgListener(Thread):
     c = str(len(self.session_queue))
     self.lock.release()
     dbgPavim.updateStatusLine()
+    if dbgPavim.dbgPavimOnce:
+      self.stop(False)
     print c+" pending connection(s) to be debug, press "+dbgPavim.dbgPavimKeyRun+" to continue."
   def nextSession(self):
     session = None
@@ -841,18 +843,19 @@ class DbgListener(Thread):
     dbgPavim.updateStatusLine()
     print ""
     return session
-  def stop(self):
+  def stop(self, closeConnection = True):
     self.lock.acquire()
     try:
       if self._status == self.LISTEN:
         client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
         client.connect ( ( '127.0.0.1', self.port ) )
         client.close()
-      for s in self.session_queue:
-        s.send_command('detach')
-        s.sock.close()
-      del self.session_queue[:]
     finally:
+      if closeConnection:
+        for s in self.session_queue:
+          s.send_command('detach')
+          s.sock.close()
+        del self.session_queue[:]
       self._status = self.CLOSED
       self.lock.release()
       dbgPavim.updateStatusLine()
@@ -882,7 +885,7 @@ class DbgListener(Thread):
       DBGPavimTrace('# Connection from %s:%d\n' % (address[0], address[1]))
       s = self.status()
       if s == self.LISTEN:
-        if dbgPavim.break_at_entry:
+        if dbgPavim.breakAtEntry:
           self.newSession(DbgSessionWithUI(sock))
         else:
           client = DbgSilentClient(DbgSession(sock))
@@ -962,54 +965,54 @@ class DBGPavim:
 
   def updateStatusLine(self):
     status = self.debugListener.status()
-    if status == DbgListener.INIT or status == DbgListener.CLOSED:
-      sl = self.normal_statusline
+    c = self.debugListener.pendingCount()
+    if c > 0:
+      sl = self.statusline+"%{'-PEND-"+str(c)+"'}"
+    elif self.debugSession.sock != None:
+      sl = self.statusline+"%{'-CONN'}"
+    elif status == DbgListener.LISTEN:
+      sl = self.statusline+"%{'-LISN-"+str(self.port)+"'}"
     else:
-      c = self.debugListener.pendingCount()
-      if c > 0:
-        sl = self.statusline+"%{'-PEND-"+str(c)+"'}"
-      elif self.debugSession.sock != None:
-        sl = self.statusline+"%{'-CONN'}"
-      else:
-        sl = self.statusline+"%{'-LISN-"+str(self.port)+"'}"
+      sl = self.normal_statusline
     vim.command("let &statusline=\""+sl+"\"")
 
   def loadSettings(self):
     self.port = int(vim.eval('g:dbgPavimPort'))
     self.dbgPavimKeyRun = vim.eval('g:dbgPavimKeyRun')
-    self.max_children = vim.eval('g:dbgPavimMaxChildren')
-    self.max_data = vim.eval('g:dbgPavimMaxData')
-    self.max_depth = vim.eval('g:dbgPavimMaxDepth')
-    self.break_at_entry = int(vim.eval('g:dbgPavimBreakAtEntry'))
-    self.show_context = int(vim.eval('g:dbgPavimShowContext'))
-    self.path_map = vim.eval('g:dbgPavimPathMap')
-    for m in self.path_map:
+    self.maxChildren = vim.eval('g:dbgPavimMaxChildren')
+    self.maxData = vim.eval('g:dbgPavimMaxData')
+    self.maxDepth = vim.eval('g:dbgPavimMaxDepth')
+    self.breakAtEntry = int(vim.eval('g:dbgPavimBreakAtEntry'))
+    self.showContext = int(vim.eval('g:dbgPavimShowContext'))
+    self.pathMap = vim.eval('g:dbgPavimPathMap')
+    self.dbgPavimOnce = int(vim.eval('g:dbgPavimOnce'))
+    for m in self.pathMap:
       m[0] = m[0].replace("\\","/")
       m[1] = m[1].replace("\\","/")
   def remotePathOf(self,lpath):
-    for m in self.path_map:
+    for m in self.pathMap:
       l = len(m[0])
       if l and lpath[0:l] == m[0]:
         return m[1]+lpath[l:]
     return lpath
   def localPathOf(self,rpath):
-    for m in self.path_map:
+    for m in self.pathMap:
       l = len(m[1])
       if l and rpath[0:l] == m[1]:
         return m[0]+rpath[l:]
     return rpath
   def setMaxChildren(self):
-    self.max_children = vim.eval('g:dbgPavimMaxChildren')
+    self.maxChildren = vim.eval('g:dbgPavimMaxChildren')
     if self.debugSession.sock != None:
-      self.debugSession.command('feature_set', '-n max_children -v ' + self.max_children)
+      self.debugSession.command('feature_set', '-n max_children -v ' + self.maxChildren)
   def setMaxDepth(self):
-    self.max_depth = vim.eval('g:dbgPavimMaxDepth')
+    self.maxDepth = vim.eval('g:dbgPavimMaxDepth')
     if self.debugSession.sock != None:
-      self.debugSession.command('feature_set', '-n max_depth -v ' + self.max_depth)
+      self.debugSession.command('feature_set', '-n max_depth -v ' + self.maxDepth)
   def setMaxData(self):
-    self.max_data = vim.eval('g:dbgPavimMaxData')
+    self.maxData = vim.eval('g:dbgPavimMaxData')
     if self.debugSession.sock != None:
-      self.debugSession.command('feature_set', '-n max_data -v ' + self.max_data)
+      self.debugSession.command('feature_set', '-n max_data -v ' + self.maxData)
   def handle_exception(self):
     DBGPavimTrace(str(sys.exc_info()[1]))
     DBGPavimTrace("".join(traceback.format_tb( sys.exc_info()[2])))
@@ -1037,7 +1040,7 @@ class DBGPavim:
     self.updateStatusLine()
   def step(self):
     self.debugSession.command('stack_get')
-    if self.show_context:
+    if self.showContext:
       self.debugSession.command('context_get', ('-d %d' % self.debugSession.curstack))
     for var in self.watchList:
       self.debugSession.command('property_get', "-d %d -n %s" % (self.debugSession.curstack, var))
@@ -1061,7 +1064,7 @@ class DBGPavim:
     self.debugSession.ui.watchwin.input(cmd, arg)
   def watch(self, name = ''):
     if name == '':
-      self.show_context = not self.show_context
+      self.showContext = not self.showContext
     else:
       if name in self.watchList:
         self.watchList.remove(name)
@@ -1076,7 +1079,7 @@ class DBGPavim:
       else:
         self.evalList.append(name)
   def listWatch(self):
-    if self.show_context:
+    if self.showContext:
       print '*CONTEXT*'
     for var in self.watchList:
       print var
@@ -1121,21 +1124,21 @@ class DBGPavim:
     """ start debugger or continue """
     try:
       status = self.debugListener.status()
-      if status == DbgListener.INIT or status == DbgListener.CLOSED:
-        self.loadSettings()
-        self.debugListener = DbgListener(self.port)
-        self.debugListener.start()
-      elif self.debugSession.sock != None:
-        self.debugSession.command('run')
-        if self.debugSession.status == 'stopping':
-          self.debugSession.command("stop")
-        elif self.debugSession.status != 'stopped':
-          self.step()
+      session = self.debugListener.nextSession()
+      if session != None:
+        self.debugSession = session
+        self.debugSession.start()
       else:
-        session = self.debugListener.nextSession()
-        if session != None:
-          self.debugSession = session
-          self.debugSession.start()
+        if self.debugSession.sock != None:
+          self.debugSession.command('run')
+          if self.debugSession.status == 'stopping':
+            self.debugSession.command("stop")
+          elif self.debugSession.status != 'stopped':
+            self.step()
+        elif status == DbgListener.CLOSED:
+          self.loadSettings()
+          self.debugListener = DbgListener(self.port)
+          self.debugListener.start()
     except:
       self.handle_exception()
 
