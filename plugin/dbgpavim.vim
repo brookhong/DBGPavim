@@ -5,7 +5,7 @@
 "=============================================================================
 "    Copyright: Copyright (C) 2012 Brook Hong
 "      License:	The MIT License
-"				
+"
 "				Permission is hereby granted, free of charge, to any person obtaining
 "				a copy of this software and associated documentation files
 "				(the "Software"), to deal in the Software without restriction,
@@ -13,10 +13,10 @@
 "				merge, publish, distribute, sublicense, and/or sell copies of the
 "				Software, and to permit persons to whom the Software is furnished
 "				to do so, subject to the following conditions:
-"				
+"
 "				The above copyright notice and this permission notice shall be included
 "				in all copies or substantial portions of the Software.
-"				
+"
 "				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 "				OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 "				MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -30,7 +30,7 @@
 "
 "               This file should reside in the plugins directory along
 "               with dbgpavim.py and be automatically sourced.
-"               
+"
 "               By default, the script expects the debugging engine to connect
 "               on port 9000. You can change this with the g:dbgPavimPort
 "               variable by putting the following line your vimrc:
@@ -88,7 +88,7 @@ endif
 " Load dbgpavim.py either from the same path where dbgpavim.vim is
 let s:dbgpavim_py = expand("<sfile>:p:h")."/dbgpavim.py"
 if filereadable(s:dbgpavim_py)
-  exec 'pyfile '.s:dbgpavim_py 
+  exec 'pyfile '.s:dbgpavim_py
 else
   call confirm('dbgpavim.vim: Unable to find '.s:dbgpavim_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
 endif
@@ -217,7 +217,7 @@ function! WatchWindowOnEnter()
 endfunction
 function! StackWindowOnEnter()
   let l:stackNo = substitute(getline("."),"\\(\\d\\+\\)\\s\\+.*","\\1","g")
-  if l:stackNo =~ "^\\d\\+$" 
+  if l:stackNo =~ "^\\d\\+$"
     execute 'python dbgPavim.debugSession.go('.l:stackNo.')'
     execute "normal \<c-w>p"
   endif
@@ -273,8 +273,11 @@ hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
 
-python dbgPavim_init()
 set laststatus=2
+if &statusline == ""
+  set statusline=%<%f\ %h%m%r\ \[%{&ff}:%{&fenc}:%Y]\ %{getcwd()}\ %=%-10{bufnr('%')}\ %=%-10.(%l,%c%V%)\ %P
+endif
+python dbgPavim_init()
 
 autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
 autocmd BufEnter STACK_WINDOW map <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>

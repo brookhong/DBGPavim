@@ -297,12 +297,14 @@ class ConsoleWindow(VimWindow):
 class DebugUI:
   """ DEBUGUI class """
   (NORMAL, DEBUG) = (0,1)
-  def __init__(self, stackwinHeight, watchwinWidth):
+  def __init__(self, stackwinRatio, watchwinRatio):
     """ initialize object """
     self.watchwin       = WatchWindow()
     self.stackwin       = StackWindow()
-    self.stackwinHeight = stackwinHeight
-    self.watchwinWidth  = watchwinWidth
+    self.stackwinRatio  = stackwinRatio
+    self.watchwinRatio  = watchwinRatio
+    self.stackwinHeight = 1
+    self.watchwinWidth  = 1
     self.helpwin        = None
     self.mode           = DebugUI.NORMAL
     self.file           = None
@@ -367,6 +369,10 @@ class DebugUI:
     self.cliwin  = None
   def create(self):
     """ create windows """
+    self.totalW = int(vim.eval('winwidth(0)'))
+    self.totalH = int(vim.eval('winheight(0)'))
+    self.stackwinHeight = int(self.totalH*self.stackwinRatio)
+    self.watchwinWidth = int(self.totalW*self.watchwinRatio)
     self.stackwin.create('botright '+str(self.stackwinHeight)+' new')
     if self.cliwin:
       self.cliwin.create('vertical new')
@@ -959,7 +965,7 @@ class DBGPavim:
     self.normal_statusline = vim.eval('&statusline')
     self.statusline="%<%f\ %h%m%r\ %=%-10.(%l,%c%V%)\ %P\ %=%{(g:dbgPavimBreakAtEntry==1)?'bae':'bap'}"
     self.breakpt    = BreakPoint()
-    self.ui         = DebugUI(12, 70)
+    self.ui         = DebugUI(0.3, 0.4)
     self.watchList  = []
     self.evalList  = []
 
