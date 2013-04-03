@@ -257,11 +257,11 @@ function! Signs()
   let l:bpts = {}
   let l:lines = split(l:signs, '\n')
   for l:line in l:lines
-    if l:line =~ "^Signs for \\S*:$"
+    if l:line =~ "\\S*:$"
       let l:file = expand("%:p")
-    elseif l:line =~ "^\\s*line=\\d*\\s*id=\\d*\\s*name=breakpt$"
-      let l:lno = substitute(l:line,"^\\s*line=\\(\\d\\+\\)\\s*id=\\d*\\s*name=breakpt$", "\\1", "g")
-      let l:id = substitute(l:line,"^\\s*line=\\d\\+\\s*id=\\(\\d\\+\\)\\s*name=breakpt$", "\\1", "g")
+    elseif l:line =~ "^\\s*\\S*=\\d*\\s*\\S*=\\d*\\s*\\S*=breakpt$"
+      let l:lno = substitute(l:line,"^\\s*\\S*=\\(\\d\\+\\)\\s*\\S*=\\d*\\s*\\S*=breakpt$", "\\1", "g")
+      let l:id = substitute(l:line,"^\\s*\\S*=\\d\\+\\s*\\S*=\\(\\d\\+\\)\\s*\\S*=breakpt$", "\\1", "g")
       let l:bpts[l:id] = [l:file, l:lno]
     endif
   endfor
