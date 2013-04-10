@@ -45,12 +45,16 @@ import time, subprocess
 from threading import Thread,Lock
 
 def getFilePath(s):
-  fn = s[7:]
+  if s[:7] == "file://":
+    fn = s[7:]
+  else:
+    fn = s
   win = 0
   if fn[2] == ':':
     fn = fn[1:]
     win = 1
   return [fn, win]
+
 tracelog = open(os.getenv("HOME").replace("\\","/")+"/.dbgpavim.trace",'w')
 def DBGPavimTrace(log):
   tracelog.write("\n"+log+"\n")
@@ -141,16 +145,19 @@ class StackWindow(VimWindow):
   def render(self, xml):
     lines = ""
     for node in xml:
+      wr = node.get('where')
+      if wr == None:
+        wr = "{main}"
       if node.tag != '{urn:debugger_protocol_v1}stack':
         return VimWindow.render(self, node)
       else:
-        if node.get('where') != '{main}':
+        if wr != '{main}':
           fmark = '()'
         else:
           fmark = ''
         [fn, win] = getFilePath(node.get('filename'))
         fn = dbgPavim.localPathOf(fn)
-        lines += str('%-2s %-15s %s:%s\n' % (node.get('level'), node.get('where')+fmark, fn, node.get('lineno')))
+        lines += str('%-2s %-15s %s:%s\n' % (node.get('level'), wr+fmark, fn, node.get('lineno')))
     self.write(lines)
   def on_create(self):
     self.command('highlight CurStack term=reverse ctermfg=White ctermbg=Red gui=reverse')
@@ -560,8 +567,6 @@ class DbgSession:
     flag = 0
     for bno in dbgPavim.breakpt.list():
       fn = dbgPavim.remotePathOf(dbgPavim.breakpt.getfile(bno))
-      if self.isWinServer:
-        fn = fn.replace("/","\\")
       msgid = self.send_command('breakpoint_set', \
                                 '-t line -f ' + fn + ' -n ' + str(dbgPavim.breakpt.getline(bno)) + ' -s enabled', \
                                 dbgPavim.breakpt.getexp(bno))
@@ -698,9 +703,12 @@ class DbgSessionWithUI(DbgSession):
       for s in stacks:
         [fn, win] = getFilePath(s.get('filename'))
         fn = dbgPavim.localPathOf(fn)
+        wr = s.get('where')
+        if wr == None:
+          wr = "{main}"
         self.stacks.append( {'file':  fn, \
                              'line':  int(s.get('lineno')),  \
-                             'where': s.get('where'),        \
+                             'where': wr,        \
                              'level': int(s.get('level'))
                              } )
 
@@ -1000,6 +1008,14 @@ class DBGPavim:
       l = len(m[0])
       if l and lpath[0:l] == m[0]:
         return m[1]+lpath[l:]
+    fn = lpath
+    if fn[:7] != "file://":
+      fn = fn.replace("\\","/")
+      if fn[1] == ':':
+        fn = "file:///"+fn
+      else:
+        fn = "file://"+fn
+      lpath = fn
     return lpath
   def localPathOf(self,rpath):
     for m in self.pathMap:
@@ -1194,8 +1210,6 @@ class DBGPavim:
       vim.command('sign place ' + str(bno) + ' name=breakpt line=' + str(row) + ' file=' + file)
       if self.debugSession.sock != None:
         fn = dbgPavim.remotePathOf(self.breakpt.getfile(bno))
-        if self.debugSession.isWinServer:
-          fn = fn.replace("/","\\")
         msgid = self.debugSession.send_command('breakpoint_set', \
                                   '-t line -f ' + fn + ' -n ' + str(self.breakpt.getline(bno)), \
                                   self.breakpt.getexp(bno))
