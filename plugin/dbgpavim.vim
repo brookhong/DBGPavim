@@ -153,12 +153,18 @@ endif
 if !exists('g:dbgPavimKeyPropertyGet')
   let g:dbgPavimKeyPropertyGet = '<F12>'
 endif
+if !exists('g:dbgPavimKeyLargeWindow')
+  let g:dbgPavimKeyLargeWindow = '<leader>+'
+endif
+if !exists('g:dbgPavimKeySmallWindow')
+  let g:dbgPavimKeySmallWindow = '<leader>-'
+endif
 exec 'map <silent> '.g:dbgPavimKeyRun.' :python dbgPavim.run()<cr>'
 exec 'map <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
 exec 'map <silent> '.g:dbgPavimKeyToggleBae.' :call Bae()<cr>'
 exec 'map <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
-map <silent> + :call ResizeWindow("+")<cr>
-map <silent> - :call ResizeWindow("-")<cr>
+exec 'map <silent> '.g:dbgPavimKeyLargeWindow.' :call ResizeWindow("+")<cr>'
+exec 'map <silent> '.g:dbgPavimKeySmallWindow.' :call ResizeWindow("-")<cr>'
 command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
 command! -nargs=? Dp python dbgPavim.cli('<args>')
@@ -268,15 +274,16 @@ function! Signs()
   return l:bpts
 endfunction
 
-hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
-hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
+if !hlexists('DbgCurrent')
+  hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
+endif
+if !hlexists('DbgBreakPt')
+  hi DbgBreakPt term=reverse ctermfg=White ctermbg=Green gui=reverse
+endif
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
 
 set laststatus=2
-if &statusline == ""
-  set statusline=%<%f\ %h%m%r\ \[%{&ff}:%{&fenc}:%Y]\ %{getcwd()}\ %=%-10{bufnr('%')}\ %=%-10.(%l,%c%V%)\ %P
-endif
 python dbgPavim_init()
 
 autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
