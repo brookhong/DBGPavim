@@ -784,10 +784,14 @@ class DbgSessionWithUI(DbgSession):
       self.ui.set_srcview(self.stacks[self.curstack]['file'], self.stacks[self.curstack]['line'])
 
   def property_get(self, name):
+    if string.find(name,' ') != -1:
+      name = "\"" + name +"\""
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
 
   def expandVar(self, name):
     (row, col) = vim.current.window.cursor
+    if string.find(name,' ') != -1:
+      name = "\"" + name +"\""
     self.command('property_get', '-d %d -n %s' % (self.curstack,  name), '', str(row))
 
   def watch_execute(self):
@@ -1116,9 +1120,7 @@ class DBGPavim:
           name = vim.eval('expand("<cword>")')
         elif name == '%v%':
           name = vim.eval('@v')
-        string.replace(name,'"','\'')
-        if string.find(name,' ') != -1:
-          name = "\"" + name +"\""
+        name = string.replace(name,'"','\'')
         if self.fileType == 'php' and name[0] != '$':
           name = '$'+name
         self.debugSession.property_get(name)
