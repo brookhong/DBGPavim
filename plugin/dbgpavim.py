@@ -451,7 +451,7 @@ class DebugUI:
     self.line    = line
 
 class DbgSession:
-  def __init__(self, sock):
+  def __init__(self, sock, address):
     self.latestRes = None
     self.msgid = 0
     self.sock = sock
@@ -459,6 +459,7 @@ class DbgSession:
     self.bptsetlst  = {}
     self.bptsetids  = {}
     self.last_command = 'None';
+    self.address = address;
   def jump(self, fn, line):
     vim.command("e +"+str(line)+" "+str(fn))
   def handle_response_breakpoint_set(self, res):
@@ -509,10 +510,10 @@ class DbgSession:
     self.recv_null()
     return body
   def send_msg(self, cmd):
-    DBGPavimTrace(str(self.msgid)+">"*16+"\n"+cmd)
+    DBGPavimTrace(str(self.msgid)+">"*16+self.address+"\n"+cmd)
     self.sock.send(cmd + '\0')
   def handle_recvd_msg(self, res):
-    DBGPavimTrace(str(self.msgid)+"<"*16+"\n"+res)
+    DBGPavimTrace(str(self.msgid)+"<"*16+self.address+"\n"+res)
     resDom = ET.fromstring(res)
     if resDom.tag == "response":
       if resDom.get('command') == "breakpoint_set":
@@ -533,14 +534,20 @@ class DbgSession:
     return self.msgid
   def ack_command(self, count=10000):
     while count>0:
+      if not dbgPavim.running:
+        return None
       count = count - 1
-      self.latestRes = self.recv_msg()
-      resDom = self.handle_recvd_msg(self.latestRes)
       try:
-        if int(resDom.get('transaction_id')) == int(self.msgid):
-          return resDom
+        self.latestRes = self.recv_msg()
+        break
       except:
-        pass
+        DBGPavimTrace("Exception in ack_command: %d time for msg %d from %s." % (count, self.msgid, self.address))
+    resDom = self.handle_recvd_msg(self.latestRes)
+    try:
+      if int(resDom.get('transaction_id')) == int(self.msgid):
+        return resDom
+    except:
+      pass
   def command(self, cmd, arg1 = '', arg2 = '', extra = '0'):
     if cmd == 'eval':
       if dbgPavim.fileType == 'php':
@@ -576,7 +583,7 @@ class DbgSession:
       self.ack_command()
 
 class DbgSessionWithUI(DbgSession):
-  def __init__(self, sock):
+  def __init__(self, sock, address):
     self.status     = None
     self.ui         = dbgPavim.ui
 
@@ -584,12 +591,13 @@ class DbgSessionWithUI(DbgSession):
     self.stacks     = []
     self.curstack   = 0
     self.laststack  = 0
-    DbgSession.__init__(self,sock)
+    DbgSession.__init__(self,sock,address)
   def copyFromParent(self, ss):
     self.latestRes = ss.latestRes
     self.msgid = ss.msgid
     self.isWinServer = ss.isWinServer
     self.sock = ss.sock
+    self.address = ss.address
     self.bptsetlst  = ss.bptsetlst
     self.bptsetids  = ss.bptsetids
   def init(self):
@@ -616,11 +624,11 @@ class DbgSessionWithUI(DbgSession):
     """ send message """
     self.sock.send(cmd + '\0')
     # log message
-    DBGPavimTrace(str(self.msgid)+">"*16+"\n"+cmd)
+    DBGPavimTrace(str(self.msgid)+">"*16+self.address+"\n"+cmd)
   def handle_recvd_msg(self, txt):
     # log messages
     txt = txt.replace('\n','')
-    DBGPavimTrace(str(self.msgid)+"<"*16+"\n"+txt)
+    DBGPavimTrace(str(self.msgid)+"<"*16+self.address+"\n"+txt)
     resDom = ET.fromstring(txt)
     tag = resDom.tag.replace("{urn:debugger_protocol_v1}","")
     """ call appropraite message handler member function, handle_XXX() """
@@ -812,14 +820,15 @@ class DbgSilentClient(Thread):
     Thread.__init__(self)
   def run(self):
     self.session.init()
-    self.session.sock.settimeout(None)
+    self.session.sock.settimeout(10)
 
     resDom = self.session.command('run')
-    status = resDom.get('status')
-    if status == "stopping":
-      self.session.command("stop")
-    elif status == "break":
-      dbgPavim.debugListener.newSession(self.session)
+    if resDom:
+      status = resDom.get('status')
+      if status == "stopping":
+        self.session.command("stop")
+      elif status == "break":
+        dbgPavim.debugListener.newSession(self.session)
 
 class DbgListener(Thread):
   (LISTEN,CLOSED) = (0,1)
@@ -841,7 +850,7 @@ class DbgListener(Thread):
     return c
   def newSession(self, ss):
     if not isinstance(ss, DbgSessionWithUI):
-      s = DbgSessionWithUI(None)
+      s = DbgSessionWithUI(None,"")
       s.copyFromParent(ss)
       ss = s
     self.lock.acquire()
@@ -874,9 +883,9 @@ class DbgListener(Thread):
           s.send_command('detach')
           s.sock.close()
         del self.session_queue[:]
-      self._status = self.CLOSED
-      self.lock.release()
-      dbgPavim.updateStatusLine()
+    self._status = self.CLOSED
+    self.lock.release()
+    dbgPavim.updateStatusLine()
   def status(self):
     self.lock.acquire()
     s = self._status
@@ -900,13 +909,14 @@ class DbgListener(Thread):
     self.lock.release()
     while 1:
       (sock, address) = serv.accept()
-      DBGPavimTrace('# Connection from %s:%d\n' % (address[0], address[1]))
+      adr = '%s:%d' % (address[0], address[1])
+      DBGPavimTrace('# Connection from %s\n' % adr)
       s = self.status()
       if s == self.LISTEN:
         if dbgPavim.breakAtEntry:
-          self.newSession(DbgSessionWithUI(sock))
+          self.newSession(DbgSessionWithUI(sock, adr))
         else:
-          client = DbgSilentClient(DbgSession(sock))
+          client = DbgSilentClient(DbgSession(sock, adr))
           client.start()
       else:
         break
@@ -971,7 +981,7 @@ class DBGPavim:
     """ initialize DBGPavim """
     self.loadSettings()
     self.debugListener = DbgListener(self.port)
-    self.debugSession  = DbgSession(None)
+    self.debugSession  = DbgSession(None,"")
     vim.command('sign unplace *')
 
     self.normal_statusline = vim.eval('&statusline')
@@ -980,6 +990,7 @@ class DBGPavim:
     self.ui         = DebugUI(0.3, 0.4)
     self.watchList  = []
     self.evalList  = []
+    self.running   = True
 
   def updateStatusLine(self):
     status = self.debugListener.status()
@@ -1048,7 +1059,7 @@ class DBGPavim:
     if errno == socket.timeout:
       if session != None:
         print "socket timeout, switch to another session."
-        ss = DbgSession(self.debugSession.sock)
+        ss = DbgSession(self.debugSession.sock, self.debugSession.address)
         ss.latestRes = self.debugSession.latestRes
         client = DbgSilentClient(ss)
         client.start()
@@ -1160,6 +1171,7 @@ class DBGPavim:
           elif self.debugSession.status != 'stopped':
             self.step()
         elif status == DbgListener.CLOSED:
+          self.running   = True
           self.loadSettings()
           self.debugListener = DbgListener(self.port)
           self.debugListener.start()
@@ -1219,6 +1231,7 @@ class DBGPavim:
         self.debugSession.ack_command()
 
   def quit(self):
+    self.running = False
     if self.debugSession.sock:
       self.debugSession.send_command('detach')
     self.ui.normal_mode()
