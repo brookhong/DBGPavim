@@ -469,6 +469,7 @@ class DbgSession:
     if tid != None:
       tid = int(tid)
       bno = self.bptsetlst[tid]
+      DBGPavimTrace("breakpoint_set %d, %d" % (tid, bno))
       del self.bptsetlst[tid]
       self.bptsetids[bno] = res.get('id')
   def getbid(self, bno):
@@ -515,12 +516,13 @@ class DbgSession:
   def handle_recvd_msg(self, res):
     DBGPavimTrace(str(self.msgid)+"<"*16+self.address+"\n"+res)
     resDom = ET.fromstring(res)
-    if resDom.tag == "response":
+    DBGPavimTrace("start handle_recvd_msg %s, %s" % (resDom.tag, resDom.get('command')))
+    if resDom.tag == "{urn:debugger_protocol_v1}response":
       if resDom.get('command') == "breakpoint_set":
         self.handle_response_breakpoint_set(resDom)
       if resDom.get('command') == "stop":
         self.close()
-    elif resDom.tag == "init":
+    elif resDom.tag == "{urn:debugger_protocol_v1}init":
       [fn, self.isWinServer] = getFilePath(resDom.get('fileuri'))
     return resDom
   def send_command(self, cmd, arg1 = '', arg2 = ''):
@@ -538,7 +540,7 @@ class DbgSession:
       resDom = self.handle_recvd_msg(self.latestRes)
       tid = resDom.get('transaction_id')
       if tid != None and int(tid) != int(self.msgid):
-        DBGPavimTrace("Unexpected msg %d when waiting for msg %d from %s" % (tid, self.msgid, self.address) )
+        DBGPavimTrace("Unexpected msg %s when waiting for msg %d from %s" % (tid, self.msgid, self.address) )
       return resDom
     except socket.error, e:
       DBGPavimTrace("Exception when recv_msg %d from %s: %s" % (self.msgid, self.address, e[0]) )
@@ -566,15 +568,12 @@ class DbgSession:
     if self.latestRes != None:
       return
     self.ack_command()
-    flag = 0
     for bno in dbgPavim.breakpt.list():
       fn = dbgPavim.remotePathOf(dbgPavim.breakpt.getfile(bno))
       msgid = self.send_command('breakpoint_set', \
                                 '-t line -f ' + fn + ' -n ' + str(dbgPavim.breakpt.getline(bno)) + ' -s enabled', \
                                 dbgPavim.breakpt.getexp(bno))
       self.bptsetlst[msgid] = bno
-      flag = 1
-    if flag:
       self.ack_command()
 
 class DbgSessionWithUI(DbgSession):
@@ -764,6 +763,8 @@ class DbgSessionWithUI(DbgSession):
   def handle_response_default(self, res):
     """handle <response command=context_get> tag """
     print res.toprettyxml()
+  def handle_response_breakpoint_remove(self, res):
+    """handle <response command=feature_set> tag """
 
   def go(self, stack):
     if stack >= 0 and stack <= self.laststack:
