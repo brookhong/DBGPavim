@@ -532,22 +532,17 @@ class DbgSession:
       line = line + ' -- ' + base64.encodestring(arg2)[0:-1]
     self.send_msg(line)
     return self.msgid
-  def ack_command(self, count=10000):
-    while count>0:
-      if not dbgPavim.running:
-        return None
-      count = count - 1
-      try:
-        self.latestRes = self.recv_msg()
-        break
-      except:
-        DBGPavimTrace("Exception in ack_command: %d time for msg %d from %s." % (count, self.msgid, self.address))
-    resDom = self.handle_recvd_msg(self.latestRes)
+  def ack_command(self):
     try:
-      if int(resDom.get('transaction_id')) == int(self.msgid):
-        return resDom
-    except:
-      pass
+      self.latestRes = self.recv_msg()
+      resDom = self.handle_recvd_msg(self.latestRes)
+      tid = resDom.get('transaction_id')
+      if tid != None and int(tid) != int(self.msgid):
+        DBGPavimTrace("Unexpected msg %d when waiting for msg %d from %s" % (tid, self.msgid, self.address) )
+      return resDom
+    except socket.error, e:
+      DBGPavimTrace("Exception when recv_msg %d from %s: %s" % (self.msgid, self.address, e[0]) )
+      return None
   def command(self, cmd, arg1 = '', arg2 = '', extra = '0'):
     if cmd == 'eval':
       if dbgPavim.fileType == 'php':
@@ -570,7 +565,7 @@ class DbgSession:
   def init(self):
     if self.latestRes != None:
       return
-    self.ack_command(1)
+    self.ack_command()
     flag = 0
     for bno in dbgPavim.breakpt.list():
       fn = dbgPavim.remotePathOf(dbgPavim.breakpt.getfile(bno))
@@ -820,15 +815,20 @@ class DbgSilentClient(Thread):
     Thread.__init__(self)
   def run(self):
     self.session.init()
-    self.session.sock.settimeout(10)
+    self.session.sock.settimeout(6)
 
-    resDom = self.session.command('run')
-    if resDom:
-      status = resDom.get('status')
-      if status == "stopping":
-        self.session.command("stop")
-      elif status == "break":
-        dbgPavim.debugListener.newSession(self.session)
+    self.session.send_command('run')
+    count = 100
+    while dbgPavim.running and count > 0:
+      resDom = self.session.ack_command()
+      if resDom != None:
+        status = resDom.get('status')
+        if status == "stopping":
+          self.session.command("stop")
+        elif status == "break":
+          dbgPavim.debugListener.newSession(self.session)
+        break
+      count = count-1
 
 class DbgListener(Thread):
   (LISTEN,CLOSED) = (0,1)
