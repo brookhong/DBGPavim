@@ -202,16 +202,20 @@ class WatchWindow(VimWindow):
         fullname = "evalResult" if (fullname == None) else ('evalResult->%s'%(fullname))
     else:
       fullname = "" if (fullname == None) else fullname
-    size = p.get('size')
     tp = p.get('type')
     children = p.get('children')
     properties = p.findall('{urn:debugger_protocol_v1}property')
+    size = p.get('size')
+    if size == None:
+      size = p.get('numchildren')
     size = ('[%s]' % (size)) if size != None else ""
     if val != None:
       value = "(%s%s) '%s'" % (tp, size, val)
     elif tp == "null":
       value = "(null)"
     else:
+      if tp == "object":
+        tp = tp+"|"+p.get('classname')
       if children == "1" and len(properties) == 0:
         value = "(%s%s)+" % (tp, size)
       else:
@@ -469,7 +473,6 @@ class DbgSession:
     if tid != None:
       tid = int(tid)
       bno = self.bptsetlst[tid]
-      DBGPavimTrace("breakpoint_set %d, %d" % (tid, bno))
       del self.bptsetlst[tid]
       self.bptsetids[bno] = res.get('id')
   def getbid(self, bno):
@@ -516,7 +519,6 @@ class DbgSession:
   def handle_recvd_msg(self, res):
     DBGPavimTrace(str(self.msgid)+"<"*16+self.address+"\n"+res)
     resDom = ET.fromstring(res)
-    DBGPavimTrace("start handle_recvd_msg %s, %s" % (resDom.tag, resDom.get('command')))
     if resDom.tag == "{urn:debugger_protocol_v1}response":
       if resDom.get('command') == "breakpoint_set":
         self.handle_response_breakpoint_set(resDom)
