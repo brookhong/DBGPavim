@@ -462,8 +462,9 @@ class DbgSession:
     self.isWinServer = 0
     self.bptsetlst  = {}
     self.bptsetids  = {}
-    self.last_command = 'None';
-    self.address = address;
+    self.last_command = 'None'
+    self.address = address
+    self.retries = 0
   def jump(self, fn, line):
     vim.command("e +"+str(line)+" "+str(fn))
   def handle_response_breakpoint_set(self, res):
@@ -529,6 +530,7 @@ class DbgSession:
     return resDom
   def send_command(self, cmd, arg1 = '', arg2 = ''):
     self.msgid = self.msgid + 1
+    self.retries = 0
     line = cmd + ' -i ' + str(self.msgid)
     if arg1 != '':
       line = line + ' ' + arg1
@@ -543,7 +545,12 @@ class DbgSession:
       tid = resDom.get('transaction_id')
       if tid != None and int(tid) != int(self.msgid):
         DBGPavimTrace("Unexpected msg %s when waiting for msg %d from %s" % (tid, self.msgid, self.address) )
+      if self.retries:
+        DBGPavimTrace("Retried %d times for msg %d from %s" % (self.retries, self.msgid, self.address) )
       return resDom
+    except socket.timeout, e:
+      self.retries = self.retries+1
+      return None
     except socket.error, e:
       DBGPavimTrace("Exception when recv_msg %d from %s: %s" % (self.msgid, self.address, e[0]) )
       return None
@@ -554,7 +561,7 @@ class DbgSession:
       else:
         arg2 = 'evalResult=(%s)' %(arg2)
     self.send_command(cmd, arg1, arg2)
-    self.last_command = cmd+'('+arg1+','+arg2+','+extra+')';
+    self.last_command = cmd+'('+arg1+','+arg2+','+extra+')'
     return self.ack_command()
   def getExtra(self):
     extra = ""
@@ -818,10 +825,10 @@ class DbgSilentClient(Thread):
     Thread.__init__(self)
   def run(self):
     self.session.init()
-    self.session.sock.settimeout(6)
+    self.session.sock.settimeout(1)
 
     self.session.send_command('run')
-    count = 100
+    count = 600
     while dbgPavim.running and count > 0:
       resDom = self.session.ack_command()
       if resDom != None:
