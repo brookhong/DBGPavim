@@ -159,12 +159,14 @@ endif
 if !exists('g:dbgPavimKeySmallWindow')
   let g:dbgPavimKeySmallWindow = '<leader>-'
 endif
-exec 'map <silent> '.g:dbgPavimKeyRun.' :python dbgPavim.run()<cr>'
-exec 'map <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
-exec 'map <silent> '.g:dbgPavimKeyToggleBae.' :call Bae()<cr>'
-exec 'map <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
-exec 'map <silent> '.g:dbgPavimKeyLargeWindow.' :call ResizeWindow("+")<cr>'
-exec 'map <silent> '.g:dbgPavimKeySmallWindow.' :call ResizeWindow("-")<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :python dbgPavim.run()<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBae.' :call Bae()<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeyLargeWindow.' :call ResizeWindow("+")<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeySmallWindow.' :call ResizeWindow("-")<cr>'
+
+exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
+
 command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
 command! -nargs=? Dp python dbgPavim.cli('<args>')
@@ -286,7 +288,7 @@ sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
 set laststatus=2
 python dbgPavim_init()
 
-autocmd BufEnter WATCH_WINDOW map <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
-autocmd BufEnter STACK_WINDOW map <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>
+autocmd BufEnter WATCH_WINDOW nnoremap <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
+autocmd BufEnter STACK_WINDOW nnoremap <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>
 autocmd BufLeave HELP__WINDOW :python dbgPavim.ui.helpwin=None
 autocmd VimLeavePre * python dbgPavim.quit()
