@@ -172,10 +172,10 @@ class WatchWindow(VimWindow):
   def decode_string(self, msg, encoding):
     if encoding == 'base64':
       value = base64.decodestring(msg)
-    elif encoding == '' or encoding == None:
+    elif encoding == '' or encoding == None or encoding == 'None':
       value = msg
     else:
-      value = "(e:%s) %s" % (encoding, p.text)
+      value = "(e:%s) %s" % (encoding, msg)
     return value
   def parseNode1(self, p):
     fullname = p.get('fullname')
