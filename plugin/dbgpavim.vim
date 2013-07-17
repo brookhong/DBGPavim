@@ -159,6 +159,9 @@ endif
 if !exists('g:dbgPavimKeySmallWindow')
   let g:dbgPavimKeySmallWindow = '<leader>-'
 endif
+if !exists('g:dbgPavimLang')
+  let g:dbgPavimLang = ''
+endif
 exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :python dbgPavim.run()<cr>'
 exec 'nnoremap <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
 exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBae.' :call Bae()<cr>'

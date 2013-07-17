@@ -281,16 +281,38 @@ class HelpWindow(VimWindow):
   def before_create(self):
     pass
   def on_create(self):
-    self.write(                                                          \
+    if vim.eval('g:dbgPavimLang') == 'cn' :
+      self.write(                                                          \
+        '[ Function Keys ]                    | [ Command Mode ]             \n' + \
+        '  <F1>   打开帮助窗口                | :Bp [arg] 切换断点[中断条件] \n' + \
+        '  <F2>   逐语句调试                  | :Up 切换至上一个文件         \n' + \
+        '  <F3>   逐过程调试                  | :Dn 切换至下一个文件         \n' + \
+        '  <F4>   运行至断点                  | :Bl 查看所有断点             \n' + \
+        '  <F5>   开始调试                    | :Pg 输出当前变量             \n' + \
+        '  <F6>   退出调试                    | :Bc 清除所有断点             \n' + \
+        '  <F7>   监视变量                    | :Bu 恢复Bc清除的所有断点     \n' + \
+        '  <F8>   切换自动调试模式            |                              \n' + \
+        '  <F9>   切换监视窗口                |                              \n' + \
+        '  <F10>  切换断点                    |                              \n' + \
+        '  <F11>  输出所有变量                |                              \n' + \
+        '  <F12>  输出当前变量                |                              \n' + \
+        '  获取帮助和最新版本,请访问 https://github.com/brookhong/DBGPavim   \n' + \
+        '')
+    else :
+      self.write(                                                          \
         '[ Function Keys ]                    | [ Command Mode ]             \n' + \
         '  <F1>   toggle help window          | :Bp toggle breakpoint        \n' + \
         '  <F2>   step into                   | :Up stack up                 \n' + \
         '  <F3>   step over                   | :Dn stack down               \n' + \
         '  <F4>   step out                    | :Bl list breakpoints         \n' + \
         '  <F5>   run                         | :Pg property get             \n' + \
-        '  <F6>   quit debugging              | <F9>   toggle layout         \n' + \
-        '  <F7>   eval                        | <F11>  get all context       \n' + \
-        '  <F8>   toggle dbgPavimBreakAtEntry | <F12>  get property at cursor\n' + \
+        '  <F6>   quit debugging              | :Bc disable all breakpoints  \n' + \
+        '  <F7>   eval                        | :Bu enabled all breakpoints  \n' + \
+        '  <F8>   toggle dbgPavimBreakAtEntry |                              \n' + \
+        '  <F9>   toggle layout               |                              \n' + \
+        '  <F10>  toggle breakpoint           |                              \n' + \
+        '  <F11>  get all context             |                              \n' + \
+        '  <F12>  get property at cursor      |                              \n' + \
         '                                                                    \n' + \
         '  For more instructions and latest version,                         \n' + \
         '               pleae refer to https://github.com/brookhong/DBGPavim \n' + \
@@ -997,6 +1019,7 @@ class DBGPavim:
     self.normal_statusline = vim.eval('&statusline')
     self.statusline="%<%f\ %h%m%r\ %=%-10.(%l,%c%V%)\ %P\ %=%{(g:dbgPavimBreakAtEntry==1)?'bae':'bap'}"
     self.breakpt    = BreakPoint()
+    self.breakold   = BreakPoint()
     self.ui         = DebugUI(0.3, 0.4)
     self.watchList  = []
     self.evalList  = []
@@ -1214,9 +1237,44 @@ class DBGPavim:
 
   def list(self):
     vim.command("lgetexpr []")
+    inCount = 0
     for bno in self.breakpt.list():
-      vim.command("lad '"+self.breakpt.getfile(bno)+":"+str(self.breakpt.getline(bno))+":1'")
+      inCount = inCount + 1
+      if self.breakpt.getexp(bno) != '':
+        vim.command("lad '"+"\|condition: "+self.breakpt.getexp(bno)+" \| "+self.breakpt.getfile(bno)+":"+str(self.breakpt.getline(bno))+":1'")
+      else:
+        vim.command("lad '"+self.breakpt.getfile(bno)+":"+str(self.breakpt.getline(bno))+":1'")
     vim.command("lw")
+    if inCount > 0 :
+      vim.command("wincmd j")
+      vim.command("resize 10")
+
+  def clear(self):
+    for bno in self.breakpt.list():
+      self.breakold.add(self.breakpt.getfile(bno), self.breakpt.getline(bno), self.breakpt.getexp(bno))
+      vim.command('sign unplace ' + str(bno))
+      id = self.debugSession.getbid(bno)
+      if self.debugSession.sock != None and id != None:
+        self.debugSession.command('breakpoint_remove', '-d ' + str(id))
+      self.breakpt.remove(bno)
+
+  def unclear(self):
+    for bno in self.breakold.list():
+      row = self.breakold.getline(bno)
+      file = self.breakold.getfile(bno)
+      exp = self.breakold.getexp(bno)
+      self.breakold.remove(bno)
+      inbno = self.breakpt.find(file, str(row))
+      if inbno == None:
+        inbno = self.breakpt.add(file, row, exp)
+        vim.command('sign place ' + str(inbno) + ' name=breakpt line=' + str(row) + ' file=' + file)
+        if self.debugSession.sock != None:
+          fn = dbgPavim.remotePathOf(self.breakpt.getfile(inbno))
+          msgid = self.debugSession.send_command('breakpoint_set', \
+                                    '-t line -f ' + fn + ' -n ' + str(self.breakpt.getline(inbno)), \
+                                    self.breakpt.getexp(inbno))
+          self.debugSession.bptsetlst[msgid] = inbno
+          self.debugSession.ack_command()
 
   def mark(self, exp = ''):
     (row, col) = vim.current.window.cursor
