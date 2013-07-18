@@ -159,6 +159,9 @@ endif
 if !exists('g:dbgPavimKeySmallWindow')
   let g:dbgPavimKeySmallWindow = '<leader>-'
 endif
+if !exists('g:dbgPavimLang')
+  let g:dbgPavimLang = ''
+endif
 exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :python dbgPavim.run()<cr>'
 exec 'nnoremap <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
 exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBae.' :call Bae()<cr>'
@@ -169,6 +172,8 @@ exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgP
 
 command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
+command! -nargs=0 Bc python dbgPavim.clear()
+command! -nargs=0 Bu python dbgPavim.unclear()
 command! -nargs=? Dp python dbgPavim.cli('<args>')
 command! -nargs=? Wc python dbgPavim.watch("<args>")
 command! -nargs=? We python dbgPavim.eval("<args>")
