@@ -172,6 +172,8 @@ exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgP
 
 command! -nargs=? Bp python dbgPavim.mark('<args>')
 command! -nargs=0 Bl python dbgPavim.list()
+command! -nargs=0 Bc python dbgPavim.clear()
+command! -nargs=0 Bu python dbgPavim.unclear()
 command! -nargs=? Dp python dbgPavim.cli('<args>')
 command! -nargs=? Wc python dbgPavim.watch("<args>")
 command! -nargs=? We python dbgPavim.eval("<args>")
