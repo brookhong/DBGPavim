@@ -1,3 +1,4 @@
+# encoding: utf-8
 # vim: tabstop=2 shiftwidth=2 softtabstop=2 expandtab
 # -*- c--oding: ko_KR.UTF-8 -*-
 # remote PHP debugger : remote debugger interface to DBGp protocol
