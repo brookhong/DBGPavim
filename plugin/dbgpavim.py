@@ -252,9 +252,9 @@ class WatchWindow(VimWindow):
       self.write('<?')
     elif dbgPavim.fileType == 'python':
       self.commenter = '## '
-    self.command('inoremap <buffer> <cr> <esc>:python dbgPavim.debugSession.watch_execute()<cr>')
     self.command('set noai nocin')
     self.command('set wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % (dbgPavim.fileType))
+    self.command('inoremap <buffer> <cr> <esc>:python dbgPavim.debugSession.watch_execute()<cr>')
   def input(self, mode, arg = ''):
     if arg == '%v%':
       arg = vim.eval('@v')
