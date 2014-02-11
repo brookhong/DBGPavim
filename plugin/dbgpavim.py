@@ -61,7 +61,7 @@ def DBGPavimTrace(log):
   tracelog.write("\n"+log+"\n")
   tracelog.flush()
 
-class VimWindow:
+class VimWindow(object):
   """ wrapper class of window of vim """
   def __init__(self, name = 'DEBUG_WINDOW'):
     """ initialize """
@@ -81,6 +81,7 @@ class VimWindow:
   def before_create(self):
     vim.command("1wincmd w")
   def on_create(self):
+    self.command('setl noswf')
     pass
   def getwinnr(self):
     return int(vim.eval("bufwinnr('"+self.name+"')"))
@@ -161,6 +162,7 @@ class StackWindow(VimWindow):
         lines += str('%-2s %-15s %s:%s\n' % (node.get('level'), wr+fmark, fn, node.get('lineno')))
     self.write(lines)
   def on_create(self):
+    super(StackWindow, self).on_create()
     self.command('highlight CurStack term=reverse ctermfg=White ctermbg=Red gui=reverse')
     self.highlight_stack(0)
   def highlight_stack(self, no):
@@ -247,13 +249,14 @@ class WatchWindow(VimWindow):
         out += "\n"
     self.write(out, lineno)
   def on_create(self):
+    super(WatchWindow, self).on_create()
     self.commenter = '// '
     if dbgPavim.fileType == 'php':
       self.write('<?')
     elif dbgPavim.fileType == 'python':
       self.commenter = '## '
-    self.command('set noai nocin')
-    self.command('set wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % (dbgPavim.fileType))
+    self.command('setl noai nocin')
+    self.command('setl wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % (dbgPavim.fileType))
     self.command('inoremap <buffer> <cr> <esc>:python dbgPavim.debugSession.watch_execute()<cr>')
   def input(self, mode, arg = ''):
     if arg == '%v%':
@@ -282,6 +285,7 @@ class HelpWindow(VimWindow):
   def before_create(self):
     pass
   def on_create(self):
+    super(HelpWindow, self).on_create()
     if vim.eval('g:dbgPavimLang') == 'cn' :
       self.write(                                                          \
         '[ Function Keys ]                    | [ Command Mode ]             \n' + \
@@ -326,6 +330,7 @@ class ConsoleWindow(VimWindow):
   def before_create(self):
     pass
   def on_create(self):
+    super(ConsoleWindow, self).on_create()
     vim.command('setlocal autoread')
 
 class DebugUI:
