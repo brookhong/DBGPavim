@@ -100,7 +100,7 @@ class VimWindow(object):
       self.buffer[:] = str(msg).split('\n')
     else:
       if lineno == 0:
-        self.buffer.append(str(msg).split('\n'))
+        self.buffer.append(msg.split('\n'))
         self.command('normal G')
       else:
         self.buffer.append(str(msg).split('\n'), lineno)
@@ -394,18 +394,20 @@ class DebugUI:
     self.destroy()
 
     # restore session
-    vim.command('source ' + self.sessfile)
-    vim.command("let &ssop=\""+self.backup_ssop+"\"")
-    os.remove(self.sessfile)
+    try:
+      vim.command('source ' + self.sessfile)
+    finally:
+      vim.command("let &ssop=\""+self.backup_ssop+"\"")
+      os.remove(self.sessfile)
 
-    self.set_highlight()
+      self.set_highlight()
 
-    self.winbuf.clear()
-    self.file    = None
-    self.line    = None
-    self.mode    = DebugUI.NORMAL
-    self.cursign = None
-    self.cliwin  = None
+      self.winbuf.clear()
+      self.file    = None
+      self.line    = None
+      self.mode    = DebugUI.NORMAL
+      self.cursign = None
+      self.cliwin  = None
   def create(self):
     """ create windows """
     self.totalW = int(vim.eval('winwidth(0)'))
@@ -659,6 +661,7 @@ class DbgSessionWithUI(DbgSession):
   def handle_recvd_msg(self, txt):
     # log messages
     txt = txt.replace('\n','')
+    txt = txt.replace('<?xml version="1.0" encoding="iso-8859-1"?>', '<?xml version="1.0" encoding="utf-8"?>', 1);
     DBGPavimTrace(str(self.msgid)+"<"*16+self.address+"\n"+txt)
     resDom = ET.fromstring(txt)
     tag = resDom.tag.replace("{urn:debugger_protocol_v1}","")
