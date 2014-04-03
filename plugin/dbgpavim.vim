@@ -87,11 +87,6 @@ endif
 
 " Load dbgpavim.py either from the same path where dbgpavim.vim is
 let s:dbgpavim_py = expand("<sfile>:p:h")."/dbgpavim.py"
-if filereadable(s:dbgpavim_py)
-  exec 'pyfile '.s:dbgpavim_py
-else
-  call confirm('dbgpavim.vim: Unable to find '.s:dbgpavim_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
-endif
 
 if !exists('g:dbgPavimPort')
   let g:dbgPavimPort = 9000
@@ -162,46 +157,79 @@ endif
 if !exists('g:dbgPavimLang')
   let g:dbgPavimLang = ''
 endif
-exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :python dbgPavim.run()<cr>'
-exec 'nnoremap <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
-exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBae.' :call Bae()<cr>'
-exec 'nnoremap <silent> '.g:dbgPavimKeyLargeWindow.' :call ResizeWindow("+")<cr>'
-exec 'nnoremap <silent> '.g:dbgPavimKeySmallWindow.' :call ResizeWindow("-")<cr>'
 
-exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
+let s:dbgpavim_py_loaded = 0
+function s:LoadDBGPavim()
+  if s:dbgpavim_py_loaded == 0
+    if filereadable(s:dbgpavim_py)
+      exec 'pyfile '.s:dbgpavim_py
+      python dbgPavim_init()
+      let s:dbgpavim_py_loaded = 1
+      autocmd VimLeavePre * python dbgPavim.quit()
+      autocmd BufEnter WATCH_WINDOW nnoremap <silent> <buffer> <Enter> :call <SID>WatchWindowOnEnter()<CR>
+      autocmd BufEnter STACK_WINDOW nnoremap <silent> <buffer> <Enter> :call <SID>StackWindowOnEnter()<CR>
+      autocmd BufLeave HELP__WINDOW :python dbgPavim.ui.helpwin=None
+      exec 'nnoremap <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
+      exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBae.' :call <SID>Bae()<cr>'
+      exec 'nnoremap <silent> '.g:dbgPavimKeyLargeWindow.' :call <SID>ResizeWindow("+")<cr>'
+      exec 'nnoremap <silent> '.g:dbgPavimKeySmallWindow.' :call <SID>ResizeWindow("-")<cr>'
+      exec 'nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
 
-command! -nargs=? Bp python dbgPavim.mark('<args>')
-command! -nargs=0 Bl python dbgPavim.list()
-command! -nargs=0 Bc python dbgPavim.clear()
-command! -nargs=0 Bu python dbgPavim.unclear()
-command! -nargs=? Dp python dbgPavim.cli('<args>')
-command! -nargs=? Wc python dbgPavim.watch("<args>")
-command! -nargs=? We python dbgPavim.eval("<args>")
-command! -nargs=0 Wl python dbgPavim.listWatch()
-command! -nargs=1 Children let g:dbgPavimMaxChildren=<args>|python dbgPavim.setMaxChildren()
-command! -nargs=1 Depth let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()
-command! -nargs=1 Length let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
+      "exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
 
-let s:keyMappings = {
-      \ g:dbgPavimKeyHelp : ':python dbgPavim.ui.help()<cr>',
-      \ g:dbgPavimKeyStepInto : ':python dbgPavim.command(\"step_into\")<cr>',
-      \ g:dbgPavimKeyStepOver : ':python dbgPavim.command(\"step_over\")<cr>',
-      \ g:dbgPavimKeyStepOut : ':python dbgPavim.command(\"step_out\")<cr>',
-      \ g:dbgPavimKeyEval : ':python dbgPavim.watch_input(\"eval\")<cr>A',
-      \ g:dbgPavimKeyRelayout : ':python dbgPavim.ui.reLayout()<cr>',
-      \ g:dbgPavimKeyContextGet : ':python dbgPavim.context()<cr>',
-      \ g:dbgPavimKeyPropertyGet : ':python dbgPavim.property()<cr>',
-      \ }
-for key in keys(s:keyMappings)
-  exec 'nnoremap <expr> <silent> '.key.' (exists("g:dbgPavimTab")==1 && g:dbgPavimTab == tabpagenr() ? "'.s:keyMappings[key].'" : "'.key.'")'
-endfor
-exec 'vnoremap '.g:dbgPavimKeyPropertyGet.' "vy:python dbgPavim.property("%v%")<CR>'
-exec 'vnoremap '.g:dbgPavimKeyEval.' "vy:python dbgPavim.watch_input("eval", "%v%")<CR>$a<CR>'
-command! -nargs=0 Up python dbgPavim.up()
-command! -nargs=0 Dn python dbgPavim.down()
-command! -nargs=? Pg python dbgPavim.property("<args>")
+      command! -nargs=? Bp python dbgPavim.mark('<args>')
+      command! -nargs=0 Bl python dbgPavim.list()
+      command! -nargs=0 Bc python dbgPavim.clear()
+      command! -nargs=0 Bu python dbgPavim.unclear()
+      command! -nargs=? Dp python dbgPavim.cli('<args>')
+      command! -nargs=? Wc python dbgPavim.watch("<args>")
+      command! -nargs=? We python dbgPavim.eval("<args>")
+      command! -nargs=0 Wl python dbgPavim.listWatch()
+      command! -nargs=1 Children let g:dbgPavimMaxChildren=<args>|python dbgPavim.setMaxChildren()
+      command! -nargs=1 Depth let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()
+      command! -nargs=1 Length let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
 
-function! ResizeWindow(flag)
+      let s:keyMappings = {
+            \ g:dbgPavimKeyHelp : ':python dbgPavim.ui.help()<cr>',
+            \ g:dbgPavimKeyStepInto : ':python dbgPavim.command(\"step_into\")<cr>',
+            \ g:dbgPavimKeyStepOver : ':python dbgPavim.command(\"step_over\")<cr>',
+            \ g:dbgPavimKeyStepOut : ':python dbgPavim.command(\"step_out\")<cr>',
+            \ g:dbgPavimKeyEval : ':python dbgPavim.watch_input(\"eval\")<cr>A',
+            \ g:dbgPavimKeyRelayout : ':python dbgPavim.ui.reLayout()<cr>',
+            \ g:dbgPavimKeyContextGet : ':python dbgPavim.context()<cr>',
+            \ g:dbgPavimKeyPropertyGet : ':python dbgPavim.property()<cr>',
+            \ }
+      for key in keys(s:keyMappings)
+        exec 'nnoremap <expr> <silent> '.key.' (exists("g:dbgPavimTab")==1 && g:dbgPavimTab == tabpagenr() ? "'.s:keyMappings[key].'" : "'.key.'")'
+      endfor
+      exec 'vnoremap '.g:dbgPavimKeyPropertyGet.' "vy:python dbgPavim.property("%v%")<CR>'
+      exec 'vnoremap '.g:dbgPavimKeyEval.' "vy:python dbgPavim.watch_input("eval", "%v%")<CR>$a<CR>'
+      command! -nargs=0 Up python dbgPavim.up()
+      command! -nargs=0 Dn python dbgPavim.down()
+      command! -nargs=? Pg python dbgPavim.property("<args>")
+      set laststatus=2
+    else
+      call confirm('dbgpavim.vim: Unable to find '.s:dbgpavim_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
+    endif
+  endif
+  return s:dbgpavim_py_loaded
+endfunction
+
+function s:StartDBGPavim()
+  if <SID>LoadDBGPavim() == 1
+    python dbgPavim.run()
+  endif
+endfunction
+exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :call <SID>StartDBGPavim()<cr>'
+
+function s:DBGPavimMark()
+  if <SID>LoadDBGPavim() == 1
+    python dbgPavim.mark()
+  endif
+endfunction
+exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :call <SID>DBGPavimMark()<cr>'
+
+function! s:ResizeWindow(flag)
   let l:width = winwidth("%")
   if l:width == &columns
     execute 'resize '.a:flag.'5'
@@ -209,11 +237,11 @@ function! ResizeWindow(flag)
     execute 'vertical resize '.a:flag.'5'
   endif
 endfunction
-function! Bae()
+function! s:Bae()
   let g:dbgPavimBreakAtEntry = (g:dbgPavimBreakAtEntry == 1) ? 0 : 1
   execute 'python dbgPavim.breakAtEntry = '.g:dbgPavimBreakAtEntry
 endfunction
-function! WatchWindowOnEnter()
+function! s:WatchWindowOnEnter()
   let l:line = getline(".")
   if l:line =~ "^\\s*.* = (.*)+;$"
     let l:var = substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")
@@ -228,7 +256,7 @@ function! WatchWindowOnEnter()
     execute 'normal za'
   endif
 endfunction
-function! StackWindowOnEnter()
+function! s:StackWindowOnEnter()
   let l:stackNo = substitute(getline("."),"\\(\\d\\+\\)\\s\\+.*","\\1","g")
   if l:stackNo =~ "^\\d\\+$"
     execute 'python dbgPavim.debugSession.go('.l:stackNo.')'
@@ -245,7 +273,6 @@ function! CheckPydbgp()
   endif
   return l:ret
 endfunction
-
 function! CheckXdebug()
   let l:ret = 0
   let l:phpinfo = system('php -r "phpinfo();"')
@@ -289,11 +316,3 @@ if !hlexists('DbgBreakPt')
 endif
 sign define current text=->  texthl=DbgCurrent linehl=DbgCurrent
 sign define breakpt text=B>  texthl=DbgBreakPt linehl=DbgBreakPt
-
-set laststatus=2
-python dbgPavim_init()
-
-autocmd BufEnter WATCH_WINDOW nnoremap <silent> <buffer> <Enter> :call WatchWindowOnEnter()<CR>
-autocmd BufEnter STACK_WINDOW nnoremap <silent> <buffer> <Enter> :call StackWindowOnEnter()<CR>
-autocmd BufLeave HELP__WINDOW :python dbgPavim.ui.helpwin=None
-autocmd VimLeavePre * python dbgPavim.quit()
