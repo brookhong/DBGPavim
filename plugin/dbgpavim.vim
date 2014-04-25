@@ -215,19 +215,15 @@ function s:LoadDBGPavim()
   return s:dbgpavim_py_loaded
 endfunction
 
-function s:StartDBGPavim()
+function s:ExeDBGPavim(method)
   if <SID>LoadDBGPavim() == 1
-    python dbgPavim.run()
+    exec 'python dbgPavim.'.a:method.'()'
   endif
 endfunction
-exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :call <SID>StartDBGPavim()<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :call <SID>ExeDBGPavim("run")<cr>'
 
-function s:DBGPavimMark()
-  if <SID>LoadDBGPavim() == 1
-    python dbgPavim.mark()
-  endif
-endfunction
-exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :call <SID>DBGPavimMark()<cr>'
+exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :call <SID>ExeDBGPavim("mark")<cr>'
+command! -nargs=? Bp :call <SID>ExeDBGPavim("mark")
 
 function! s:ResizeWindow(flag)
   let l:width = winwidth("%")
