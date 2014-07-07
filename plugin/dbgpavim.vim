@@ -159,7 +159,7 @@ if !exists('g:dbgPavimLang')
 endif
 
 let s:dbgpavim_py_loaded = 0
-function s:LoadDBGPavim()
+function! s:LoadDBGPavim()
   if s:dbgpavim_py_loaded == 0
     if filereadable(s:dbgpavim_py)
       exec 'pyfile '.s:dbgpavim_py
@@ -215,7 +215,7 @@ function s:LoadDBGPavim()
   return s:dbgpavim_py_loaded
 endfunction
 
-function s:ExeDBGPavim(method)
+function! s:ExeDBGPavim(method)
   if <SID>LoadDBGPavim() == 1
     exec 'python dbgPavim.'.a:method.'()'
   endif
