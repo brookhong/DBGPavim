@@ -395,7 +395,9 @@ class DebugUI:
 
     # restore session
     try:
+      vim.command('call UnlockVars()')
       vim.command('source ' + self.sessfile)
+      vim.command('call RelockVars()')
     finally:
       vim.command("let &ssop=\""+self.backup_ssop+"\"")
       os.remove(self.sessfile)

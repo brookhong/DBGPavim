@@ -303,6 +303,23 @@ function! Signs()
   endfor
   return l:bpts
 endfunction
+function! UnlockVars()
+  let g:dbgpavimLocked = []
+  for v in keys(g:)
+    let a = 'g:'.v
+    if islocked(a)
+      exec 'unlockvar '.a
+      call add(g:dbgpavimLocked, a)
+    endif
+  endfor
+endfunction
+function! RelockVars()
+  for v in g:dbgpavimLocked
+    exec 'lockvar '.v
+  endfor
+  let g:dbgpavimLocked = []
+endfunction
+
 
 if !hlexists('DbgCurrent')
   hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
