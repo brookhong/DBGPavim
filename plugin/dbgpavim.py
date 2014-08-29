@@ -347,7 +347,6 @@ class DebugUI:
     self.file           = None
     self.line           = None
     self.cursign        = None
-    self.clilog         = os.getenv("HOME").replace("\\","/")+"/.dbgpavim.cli"
     self.cliwin         = None
     self.backup_ssop    = vim.eval('&ssop')
 
@@ -633,9 +632,10 @@ class DbgSessionWithUI(DbgSession):
     self.s_command('feature_set', '-n max_data -v ' + dbgPavim.maxData)
     self.s_command('feature_set', '-n max_depth -v ' + dbgPavim.maxDepth)
     self.s_command(first_command)
-  def start(self):
+  def s_start(self, cliwin = None):
     self.sock.settimeout(30)
 
+    self.ui.cliwin = cliwin
     self.ui.create(self)
     if self.bap:
       self.handle_recvd_msg(self.latestRes)
@@ -886,7 +886,7 @@ class DbgListener(Thread):
     self._status  = self.CLOSED
     self.lock = Lock()
     Thread.__init__(self)
-  def start(self):
+  def l_start(self):
     Thread.start(self)
     time.sleep(0.1)
     dbgPavim.updateStatusLine()
@@ -994,7 +994,7 @@ class BreakPoint:
     del self.dictionaries[bno]
   def find(self, file, line):
     """ find break point and return bno(breakpoint number) """
-    signs = vim.eval('Signs()')
+    signs = vim.eval('dbgpavim#Signs()')
     for k in signs.keys():
       if signs[k][0] == file and signs[k][1] == line:
         bno = int(k)
@@ -1042,6 +1042,7 @@ class DBGPavim:
     self.evalList  = []
     self.running   = True
     self.debugSessions = {}
+    self.cliwin = None
 
   def updateStatusLine(self):
     if vim.eval('exists("t:dbgpavimDebugging")') == '1':
@@ -1117,7 +1118,7 @@ class DBGPavim:
         client.start()
         del self.debugSessions[currentSession.address]
         self.debugSessions[session.address] = session
-        session.start()
+        session.s_start()
       else:
         print "socket timeout, try again or press F6 to stop debugging."
     else: #errno == socket.error:
@@ -1125,7 +1126,7 @@ class DBGPavim:
       currentSession.close()
       if session != None:
         self.debugSessions[session.address] = session
-        session.start()
+        session.s_start()
     self.updateStatusLine()
 
   def getCurrentSession(self):
@@ -1215,40 +1216,41 @@ class DBGPavim:
         ss = self.debugListener.nextSession()
         if ss:
           self.debugSessions[ss.address] = ss
-          ss.start()
+          ss.s_start(self.cliwin)
+          self.cliwin = None
         elif lstatus == DbgListener.CLOSED:
           self.running   = True
           self.loadSettings()
           self.debugListener = DbgListener(self.port)
-          self.debugListener.start()
+          self.debugListener.l_start()
     except:
       self.handle_exception(ss)
 
-  def cli(self, args):
+  def cli(self, args=""):
     vim.command("let g:dbgPavimBreakAtEntry=1")
-    ss = self.getCurrentSession()
-    if ss:
-      ss.ui.cliwin = ConsoleWindow(ss.ui.clilog)
-      filetype = vim.eval('&filetype')
-      filename = vim.eval('expand("%")')
-      if filename:
-        cmd = ' '+filename+' '+args
-        if filetype == 'php':
-          if vim.eval('CheckXdebug()') == '0':
-            cmd = 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port='+str(self.port)+cmd
-        elif filetype == 'python':
-          if vim.eval('CheckPydbgp()') == '0':
-            cmd = 'pydbgp -u -d '+str(self.port)+cmd
-        if cmd[0] != ' ':
-          self.run()
-          ar = AsyncRunner(cmd, ss.ui.clilog)
-          ar.start()
-          time.sleep(0.4)
-          #vim.eval('feedkeys("\\'+self.dbgPavimKeyRun+'")')
-        else:
-          print "Only python and php file debugging are integrated for now."
+    filetype = vim.eval('&filetype')
+    filename = vim.eval('expand("%")')
+    if filename:
+      cmd = ' '+filename+' '+args
+      if filetype == 'php':
+        if vim.eval('dbgpavim#CheckXdebug()') == '0':
+          cmd = 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port='+str(self.port)+cmd
+      elif filetype == 'python':
+        if vim.eval('dbgpavim#CheckPydbgp()') == '0':
+          cmd = 'pydbgp -u -d '+str(self.port)+cmd
       else:
-        print "You need open one python or php file first."
+        print "Only python and php file debugging are integrated for now."
+      if cmd[0] != ' ':
+        clilog = os.getenv("HOME").replace("\\","/")+"/.dbgpavim.cli"
+        self.cliwin = ConsoleWindow(clilog)
+        self.run()
+        self.dp = True
+        ar = AsyncRunner(cmd, clilog)
+        ar.start()
+        time.sleep(0.4)
+        #vim.eval('feedkeys("\\'+self.dbgPavimKeyRun+'")')
+    else:
+      print "You need open one python or php file first."
 
   def list(self):
     vim.command("lgetexpr []")

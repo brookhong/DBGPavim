@@ -4,26 +4,26 @@
 " Script Info and Documentation  {{{
 "=============================================================================
 "    Copyright: Copyright (C) 2012 Brook Hong
-"      License:	The MIT License
+"      License: The MIT License
 "
-"				Permission is hereby granted, free of charge, to any person obtaining
-"				a copy of this software and associated documentation files
-"				(the "Software"), to deal in the Software without restriction,
-"				including without limitation the rights to use, copy, modify,
-"				merge, publish, distribute, sublicense, and/or sell copies of the
-"				Software, and to permit persons to whom the Software is furnished
-"				to do so, subject to the following conditions:
+"       Permission is hereby granted, free of charge, to any person obtaining
+"       a copy of this software and associated documentation files
+"       (the "Software"), to deal in the Software without restriction,
+"       including without limitation the rights to use, copy, modify,
+"       merge, publish, distribute, sublicense, and/or sell copies of the
+"       Software, and to permit persons to whom the Software is furnished
+"       to do so, subject to the following conditions:
 "
-"				The above copyright notice and this permission notice shall be included
-"				in all copies or substantial portions of the Software.
+"       The above copyright notice and this permission notice shall be included
+"       in all copies or substantial portions of the Software.
 "
-"				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-"				OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-"				MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-"				IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-"				CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-"				TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-"				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+"       OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+"       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+"       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+"       CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+"       TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+"       SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 " Name Of File: dbgpavim.vim, dbgpavim.py
 "  Description: remote debugger interface to DBGp protocol
 "               The DBGPavim originates from http://www.vim.org/scripts/script.php?script_id=1152, with a new enhanced debugger engine.
@@ -177,7 +177,6 @@ function! s:LoadDBGPavim()
       command! -nargs=0 Bl python dbgPavim.list()
       command! -nargs=0 Bc python dbgPavim.clear()
       command! -nargs=0 Bu python dbgPavim.unclear()
-      command! -nargs=? Dp python dbgPavim.cli('<args>')
       command! -nargs=? Wc python dbgPavim.watch("<args>")
       command! -nargs=? We python dbgPavim.eval("<args>")
       command! -nargs=0 Wl python dbgPavim.listWatch()
@@ -205,6 +204,7 @@ endfunction
 exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :call <SID>ExeDBGPavim("run")<cr>'
 exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBp.' :call <SID>ExeDBGPavim("mark")<cr>'
 command! -nargs=? Bp :call <SID>ExeDBGPavim("mark")
+command! -nargs=? Dp :call <SID>ExeDBGPavim("cli")
 
 function! s:ResizeWindow(flag)
   let l:width = winwidth("%")
@@ -260,16 +260,16 @@ function! dbgpavim#StackWindowOnEnter()
   endif
 endfunction
 
-function! CheckPydbgp()
+function! dbgpavim#CheckPydbgp()
   let l:ret = 0
-  let l:pydbgp = expand('`pydbgp -h`')
-  if l:pydbgp == ''
-    echo "Please install Komodo Python Remote Debugging Client."
+  let l:pydbgp = executable('pydbgp')
+  if l:pydbgp == 0
+    echo "Please install Komodo Python Remote Debugging Client, or run: /path/to/pydbgp.py ".expand('%:p')
     let l:ret = 1
   endif
   return l:ret
 endfunction
-function! CheckXdebug()
+function! dbgpavim#CheckXdebug()
   let l:ret = 0
   let l:phpinfo = system('php -r "phpinfo();"')
   let l:port = matchstr(l:phpinfo, 'xdebug.remote_port => \d\+')
@@ -285,7 +285,7 @@ function! CheckXdebug()
   endif
   return l:ret
 endfunction
-function! Signs()
+function! dbgpavim#Signs()
   let l:signs = ''
   redir => l:signs
   silent exec 'sign place buffer='.bufnr('%')
