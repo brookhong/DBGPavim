@@ -48,6 +48,14 @@ The debugger backend breaks only at breakpoints by default. If you would like th
 
     let g:dbgPavimBreakAtEntry = 1
 
+### Debug multiple different sessions simultaneously in diffrent tabs
+
+If there are multiple connections to your server at the same time, you can debug all of them simultaneously in different tabs.
+
+The below screencast demos the debugging of two different sessions: one for PHP within Apache, another for Python CLI.
+
+![DBGPavim-simultaneously](https://raw.githubusercontent.com/brookhong/brookhong.github.io/master/assets/images/DBGPavim.gif)
+
 ### New commands and function keys
 
 In normal mode
