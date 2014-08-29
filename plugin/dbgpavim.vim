@@ -166,16 +166,12 @@ function! s:LoadDBGPavim()
       python dbgPavim_init()
       let s:dbgpavim_py_loaded = 1
       autocmd VimLeavePre * python dbgPavim.quit()
-      autocmd BufEnter WATCH_WINDOW nnoremap <silent> <buffer> <Enter> :call <SID>WatchWindowOnEnter()<CR>
-      autocmd BufEnter STACK_WINDOW nnoremap <silent> <buffer> <Enter> :call <SID>StackWindowOnEnter()<CR>
-      autocmd BufLeave HELP__WINDOW :python dbgPavim.ui.helpwin=None
+      autocmd TabEnter * python dbgPavim.updateStatusLine()
       exec 'nnoremap <silent> '.g:dbgPavimKeyQuit.' :python dbgPavim.quit()<cr>'
       exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBae.' :call <SID>Bae()<cr>'
       exec 'nnoremap <silent> '.g:dbgPavimKeyLargeWindow.' :call <SID>ResizeWindow("+")<cr>'
       exec 'nnoremap <silent> '.g:dbgPavimKeySmallWindow.' :call <SID>ResizeWindow("-")<cr>'
       exec 'nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
-
-      "exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :python dbgPavim.mark()<cr>'
 
       command! -nargs=? Bp python dbgPavim.mark('<args>')
       command! -nargs=0 Bl python dbgPavim.list()
@@ -189,24 +185,9 @@ function! s:LoadDBGPavim()
       command! -nargs=1 Depth let g:dbgPavimMaxDepth=<args>|python dbgPavim.setMaxDepth()
       command! -nargs=1 Length let g:dbgPavimMaxData=<args>|python dbgPavim.setMaxData()
 
-      let s:keyMappings = {
-            \ g:dbgPavimKeyHelp : ':python dbgPavim.ui.help()<cr>',
-            \ g:dbgPavimKeyStepInto : ':python dbgPavim.command(\"step_into\")<cr>',
-            \ g:dbgPavimKeyStepOver : ':python dbgPavim.command(\"step_over\")<cr>',
-            \ g:dbgPavimKeyStepOut : ':python dbgPavim.command(\"step_out\")<cr>',
-            \ g:dbgPavimKeyEval : ':python dbgPavim.watch_input(\"eval\")<cr>A',
-            \ g:dbgPavimKeyRelayout : ':python dbgPavim.ui.reLayout()<cr>',
-            \ g:dbgPavimKeyContextGet : ':python dbgPavim.context()<cr>',
-            \ g:dbgPavimKeyPropertyGet : ':python dbgPavim.property()<cr>',
-            \ }
-      for key in keys(s:keyMappings)
-        exec 'nnoremap <expr> <silent> '.key.' (exists("g:dbgPavimTab")==1 && g:dbgPavimTab == tabpagenr() ? "'.s:keyMappings[key].'" : "'.key.'")'
-      endfor
-      exec 'vnoremap '.g:dbgPavimKeyPropertyGet.' "vy:python dbgPavim.property("%v%")<CR>'
-      exec 'vnoremap '.g:dbgPavimKeyEval.' "vy:python dbgPavim.watch_input("eval", "%v%")<CR>$a<CR>'
-      command! -nargs=0 Up python dbgPavim.up()
-      command! -nargs=0 Dn python dbgPavim.down()
-      command! -nargs=? Pg python dbgPavim.property("<args>")
+      command! -nargs=0 Up python dbgPavim.session_command("up")
+      command! -nargs=0 Dn python dbgPavim.session_command("down")
+      command! -nargs=? Pg python dbgPavim.session_command("property_get", "<args>")
       set laststatus=2
     else
       call confirm('dbgpavim.vim: Unable to find '.s:dbgpavim_py.'. Place it in either your home vim directory or in the Vim runtime directory.', 'OK')
@@ -220,9 +201,9 @@ function! s:ExeDBGPavim(method)
     exec 'python dbgPavim.'.a:method.'()'
   endif
 endfunction
-exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :call <SID>ExeDBGPavim("run")<cr>'
 
-exec 'autocmd FileType php,python,javascript nnoremap <buffer> <silent> '.g:dbgPavimKeyToggleBp.' :call <SID>ExeDBGPavim("mark")<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeyRun.' :call <SID>ExeDBGPavim("run")<cr>'
+exec 'nnoremap <silent> '.g:dbgPavimKeyToggleBp.' :call <SID>ExeDBGPavim("mark")<cr>'
 command! -nargs=? Bp :call <SID>ExeDBGPavim("mark")
 
 function! s:ResizeWindow(flag)
@@ -237,25 +218,44 @@ function! s:Bae()
   let g:dbgPavimBreakAtEntry = (g:dbgPavimBreakAtEntry == 1) ? 0 : 1
   execute 'python dbgPavim.breakAtEntry = '.g:dbgPavimBreakAtEntry
 endfunction
-function! s:WatchWindowOnEnter()
+
+function! dbgpavim#bindKeys()
+  let s:keyMappings = {
+        \ g:dbgPavimKeyHelp : ':python dbgPavim.session_command("help")<cr>',
+        \ g:dbgPavimKeyStepInto : ':python dbgPavim.command("step_into")<cr>',
+        \ g:dbgPavimKeyStepOver : ':python dbgPavim.command("step_over")<cr>',
+        \ g:dbgPavimKeyStepOut : ':python dbgPavim.command("step_out")<cr>',
+        \ g:dbgPavimKeyEval : ':python dbgPavim.watch_input("eval")<cr>A',
+        \ g:dbgPavimKeyRelayout : ':python dbgPavim.session_command("reLayout")<cr>',
+        \ g:dbgPavimKeyContextGet : ':python dbgPavim.context()<cr>',
+        \ g:dbgPavimKeyPropertyGet : ':python dbgPavim.session_command("property_get", "")<cr>',
+        \ }
+  for key in keys(s:keyMappings)
+    exec 'nnoremap <buffer> <silent> '.key.' '.s:keyMappings[key]
+  endfor
+  exec 'vnoremap <buffer> '.g:dbgPavimKeyPropertyGet.' "vy:python dbgPavim.session_command("property_get","%v%")<CR>'
+  exec 'vnoremap <buffer> '.g:dbgPavimKeyEval.' "vy:python dbgPavim.watch_input("eval", "%v%")<CR>$a<CR>'
+endfunction
+
+function! dbgpavim#WatchWindowOnEnter()
   let l:line = getline(".")
   if l:line =~ "^\\s*.* = (.*)+;$"
     let l:var = substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")
     let l:var = substitute(l:var,"'","\\\\'","g")
-    execute "python dbgPavim.debugSession.expandVar('".l:var."')"
+    execute "python dbgPavim.session_command('expandVar', '".l:var."')"
     execute "normal \<c-w>p"
   elseif l:line =~ "^\\d\\+  .*:\\d\\+$"
     let fn = substitute(l:line,"^\\d\\+  \\(.*\\):\\d\\+$","\\1","")
     let ln = substitute(l:line,"^\\d\\+  .*:\\(\\d\\+\\)$","\\1","")
-    execute 'python dbgPavim.debugSession.jump("'.l:fn.'",'.l:ln.')'
+    execute 'python dbgPavim.session_command("jump","'.l:fn.'",'.l:ln.')'
   elseif foldlevel(".") > 0
     execute 'normal za'
   endif
 endfunction
-function! s:StackWindowOnEnter()
+function! dbgpavim#StackWindowOnEnter()
   let l:stackNo = substitute(getline("."),"\\(\\d\\+\\)\\s\\+.*","\\1","g")
   if l:stackNo =~ "^\\d\\+$"
-    execute 'python dbgPavim.debugSession.go('.l:stackNo.')'
+    execute 'python dbgPavim.session_command("go", '.l:stackNo.')'
     execute "normal \<c-w>p"
   endif
 endfunction
@@ -303,23 +303,6 @@ function! Signs()
   endfor
   return l:bpts
 endfunction
-function! UnlockVars()
-  let g:dbgpavimLocked = []
-  for v in keys(g:)
-    let a = 'g:'.v
-    if islocked(a)
-      exec 'unlockvar '.a
-      call add(g:dbgpavimLocked, a)
-    endif
-  endfor
-endfunction
-function! RelockVars()
-  for v in g:dbgpavimLocked
-    exec 'lockvar '.v
-  endfor
-  let g:dbgpavimLocked = []
-endfunction
-
 
 if !hlexists('DbgCurrent')
   hi DbgCurrent term=reverse ctermfg=White ctermbg=Red gui=reverse
