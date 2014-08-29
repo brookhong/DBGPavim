@@ -222,9 +222,9 @@ endfunction
 function! dbgpavim#bindKeys()
   let s:keyMappings = {
         \ g:dbgPavimKeyHelp : ':python dbgPavim.session_command("help")<cr>',
-        \ g:dbgPavimKeyStepInto : ':python dbgPavim.command("step_into")<cr>',
-        \ g:dbgPavimKeyStepOver : ':python dbgPavim.command("step_over")<cr>',
-        \ g:dbgPavimKeyStepOut : ':python dbgPavim.command("step_out")<cr>',
+        \ g:dbgPavimKeyStepInto : ':python dbgPavim.d_command("step_into")<cr>',
+        \ g:dbgPavimKeyStepOver : ':python dbgPavim.d_command("step_over")<cr>',
+        \ g:dbgPavimKeyStepOut : ':python dbgPavim.d_command("step_out")<cr>',
         \ g:dbgPavimKeyEval : ':python dbgPavim.watch_input("eval")<cr>A',
         \ g:dbgPavimKeyRelayout : ':python dbgPavim.session_command("reLayout")<cr>',
         \ g:dbgPavimKeyContextGet : ':python dbgPavim.context()<cr>',

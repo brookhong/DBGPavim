@@ -81,7 +81,7 @@ class VimWindow(object):
   def before_create(self):
     vim.command("1wincmd w")
   def on_create(self):
-    self.command('setl noswf')
+    self.w_command('setl noswf')
     pass
   def getwinnr(self):
     return int(vim.eval("bufwinnr('"+self.name+"')"))
@@ -101,10 +101,10 @@ class VimWindow(object):
     else:
       if lineno == 0:
         self.buffer.append(msg.split('\n'))
-        self.command('normal G')
+        self.w_command('normal G')
       else:
         self.buffer.append(str(msg).split('\n'), lineno)
-        self.command("normal %dG" % (lineno+1))
+        self.w_command("normal %dG" % (lineno+1))
     #self.window.cursor = (len(self.buffer), 1)
   def create(self, method = 'new'):
     """ create window """
@@ -121,14 +121,14 @@ class VimWindow(object):
     """ destroy window """
     if self.buffer == None or len(dir(self.buffer)) == 0:
       return
-    self.command('bdelete "%s"' % self.name)
+    self.w_command('bdelete "%s"' % self.name)
     self.firstwrite = 1
   def clean(self):
     """ clean all datas in buffer """
     self.prepare()
     self.buffer[:] = []
     self.firstwrite = 1
-  def command(self, cmd):
+  def w_command(self, cmd):
     """ go to my window & execute command """
     self.prepare()
     winnr = self.getwinnr()
@@ -165,8 +165,8 @@ class StackWindow(VimWindow):
     vim.command('highlight CurStack term=reverse ctermfg=White ctermbg=Red gui=reverse')
     self.highlight_stack(0)
   def highlight_stack(self, no):
-    self.command('syntax clear')
-    self.command('syntax region CurStack start="^' +str(no)+ ' " end="$"')
+    self.w_command('syntax clear')
+    vim.command('syntax region CurStack start="^' +str(no)+ ' " end="$"')
 
 class WatchWindow(VimWindow):
   def __init__(self, name = 'WATCH_WINDOW'):
@@ -254,7 +254,7 @@ class WatchWindow(VimWindow):
       self.write('<?')
     elif self.language == 'python':
       self.commenter = '## '
-    self.command('setl noai nocin')
+    self.w_command('setl noai nocin')
     vim.command('setl wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % self.language)
     vim.command('inoremap <buffer> <cr> <esc>:python dbgPavim.session_command("watch_execute")<cr>')
     vim.command('nnoremap <silent> <buffer> <Enter> :call dbgpavim#WatchWindowOnEnter()<CR>')
@@ -268,7 +268,7 @@ class WatchWindow(VimWindow):
       self.buffer[-1] = line + arg
     else:
       self.buffer.append(self.commenter+'=> '+mode+': '+arg)
-    self.command('normal G')
+    self.w_command('normal G')
   def get_command(self):
     line = self.buffer[-1]
     if line[0:11] == self.commenter+'=> exec:':
@@ -376,8 +376,8 @@ class DebugUI:
     self.set_highlight()
   def reLayout(self):
     if self.stackwin.getHeight() != self.stackwinHeight or self.watchwin.getWidth() != self.watchwinWidth:
-      self.stackwin.command("resize "+str(self.stackwinHeight))
-      self.watchwin.command("vertical resize "+str(self.watchwinWidth))
+      self.stackwin.w_command("resize "+str(self.stackwinHeight))
+      self.watchwin.w_command("vertical resize "+str(self.watchwinWidth))
     else:
       vim.command("wincmd _")
       vim.command("wincmd |")
@@ -458,6 +458,7 @@ class DbgSession(object):
     self.address = address
     self.retries = 0
     self.closed = False
+    self.silent_commmands = {}
   def jump(self, fn, line):
     vim.command("e +"+str(line)+" "+str(fn))
   def handle_response_breakpoint_set(self, res):
@@ -570,7 +571,7 @@ class DbgSession(object):
     except socket.error, e:
       DBGPavimTrace("Exception when recv_msg %d from %s: %s" % (self.msgid, self.address, e[0]) )
       return None
-  def command(self, cmd, arg1 = '', arg2 = '', extra = '0'):
+  def s_command(self, cmd, arg1 = '', arg2 = '', extra = '0', silent = False):
     if cmd == 'eval':
       if self.language == 'php':
         arg2 = '$evalResult=(%s)' %(arg2)
@@ -578,6 +579,8 @@ class DbgSession(object):
         arg2 = 'evalResult=(%s)' %(arg2)
     self.send_command(cmd, arg1, arg2)
     self.last_command = cmd+'('+arg1+','+arg2+','+extra+')'
+    if silent:
+      self.silent_commmands[self.msgid] = 1
     return self.ack_command()
   def getExtra(self):
     extra = ""
@@ -626,10 +629,10 @@ class DbgSessionWithUI(DbgSession):
     self.bptsetlst  = ss.bptsetlst
     self.bptsetids  = ss.bptsetids
   def init(self, first_command):
-    self.command('feature_set', '-n max_children -v ' + dbgPavim.maxChildren)
-    self.command('feature_set', '-n max_data -v ' + dbgPavim.maxData)
-    self.command('feature_set', '-n max_depth -v ' + dbgPavim.maxDepth)
-    self.command(first_command)
+    self.s_command('feature_set', '-n max_children -v ' + dbgPavim.maxChildren)
+    self.s_command('feature_set', '-n max_data -v ' + dbgPavim.maxData)
+    self.s_command('feature_set', '-n max_depth -v ' + dbgPavim.maxDepth)
+    self.s_command(first_command)
   def start(self):
     self.sock.settimeout(30)
 
@@ -642,7 +645,8 @@ class DbgSessionWithUI(DbgSession):
 
     self.ui.set_srcview(*self.lastPos)
     if self.language == 'php':
-      self.command('property_get', "-d %d -n $_SERVER['REQUEST_URI']" % (self.laststack))
+      self.s_command('property_get', "-d %d -n $_SERVER['REQUEST_URI']" % (self.laststack), silent = True)
+      self.s_command('property_get', "-d %d -n $argv" % (self.laststack), silent = True)
     self.ui.go_srcview()
   def handle_recvd_msg(self, txt):
     # log messages
@@ -705,9 +709,13 @@ class DbgSessionWithUI(DbgSession):
     """ handle <error> tag """
     DBGPavimTrace(ET.tostring(res))
     errors  = res.findall('{urn:debugger_protocol_v1}error')
-    for e in errors:
-      error_msg = e.find('{urn:debugger_protocol_v1}message')
-      self.ui.watchwin.write(self.ui.watchwin.commenter+'Error when '+self.last_command+': '+error_msg.text)
+    tid = int(res.get('transaction_id'))
+    if tid in self.silent_commmands:
+      del self.silent_commmands[tid]
+    else:
+      for e in errors:
+        error_msg = e.find('{urn:debugger_protocol_v1}message')
+        self.ui.watchwin.write('%s Error when %s (%d): %s' % (self.ui.watchwin.commenter, self.last_command, tid, error_msg.text))
 
   def handle_response_stack_get(self, res):
     """handle <response command=stack_get> tag
@@ -824,22 +832,22 @@ class DbgSessionWithUI(DbgSession):
         name = '$'+name
       if string.find(name,' ') != -1:
         name = "\"" + name +"\""
-      self.command('property_get', '-d %d -n %s' % (self.curstack,  name))
+      self.s_command('property_get', '-d %d -n %s' % (self.curstack,  name))
 
   def expandVar(self, name):
     (row, col) = vim.current.window.cursor
     if string.find(name,' ') != -1:
       name = "\"" + name +"\""
-    self.command('property_get', '-d %d -n %s' % (self.curstack,  name), '', str(row))
+    self.s_command('property_get', '-d %d -n %s' % (self.curstack,  name), '', str(row))
 
   def watch_execute(self):
     """ execute command in watch window """
     (cmd, expr) = self.ui.watchwin.get_command()
     if cmd == 'exec':
-      self.command('exec', '', expr)
+      self.s_command('exec', '', expr)
       print cmd, '--', expr
     elif cmd == 'eval':
-      self.command('eval', '', expr)
+      self.s_command('eval', '', expr)
       print cmd, '--', expr
     else:
       print "no commands", cmd, expr
@@ -860,7 +868,7 @@ class DbgSilentClient(Thread):
         if resDom != None:
           status = resDom.get('status')
           if status == "stopping":
-            self.session.command("stop")
+            self.session.s_command("stop")
           elif status == "break":
             dbgPavim.debugListener.newSession(self.session, True)
           break
@@ -1085,15 +1093,15 @@ class DBGPavim:
   def setMaxChildren(self):
     self.maxChildren = vim.eval('g:dbgPavimMaxChildren')
     for k in self.debugSessions.keys():
-      self.debugSessions[k].command('feature_set', '-n max_children -v ' + self.maxChildren)
+      self.debugSessions[k].s_command('feature_set', '-n max_children -v ' + self.maxChildren)
   def setMaxDepth(self):
     self.maxDepth = vim.eval('g:dbgPavimMaxDepth')
     for k in self.debugSessions.keys():
-      self.debugSessions[k].command('feature_set', '-n max_depth -v ' + self.maxDepth)
+      self.debugSessions[k].s_command('feature_set', '-n max_depth -v ' + self.maxDepth)
   def setMaxData(self):
     self.maxData = vim.eval('g:dbgPavimMaxData')
     for k in self.debugSessions.keys():
-      self.debugSessions[k].command('feature_set', '-n max_data -v ' + self.maxData)
+      self.debugSessions[k].s_command('feature_set', '-n max_data -v ' + self.maxData)
   def handle_exception(self, currentSession):
     DBGPavimTrace(str(sys.exc_info()[1]))
     DBGPavimTrace("".join(traceback.format_tb( sys.exc_info()[2])))
@@ -1140,22 +1148,22 @@ class DBGPavim:
   def step(self):
     ss = self.getCurrentSession()
     if ss:
-      ss.command('stack_get')
+      ss.s_command('stack_get')
       if self.showContext:
-        ss.command('context_get', ('-d %d' % ss.curstack))
+        ss.s_command('context_get', ('-d %d' % ss.curstack))
       for var in self.watchList:
-        ss.command('property_get', "-d %d -n %s" % (ss.curstack, var))
+        ss.s_command('property_get', "-d %d -n %s" % (ss.curstack, var))
       for expr in self.evalList:
-        ss.command('eval', '', expr)
-  def command(self, msg, arg1 = '', arg2 = ''):
+        ss.s_command('eval', '', expr)
+  def d_command(self, msg, arg1 = '', arg2 = ''):
     try:
       ss = self.getCurrentSession()
       if ss:
-        ss.command(msg, arg1, arg2)
+        ss.s_command(msg, arg1, arg2)
         if ss.status != 'stopping':
           self.step()
         else:
-          ss.command('stop')
+          ss.s_command('stop')
       else:
         print 'No debug session started.'
     except:
@@ -1163,7 +1171,7 @@ class DBGPavim:
   def context(self):
     ss = self.getCurrentSession()
     if ss:
-      ss.command('context_get', ('-d %d' % ss.curstack))
+      ss.s_command('context_get', ('-d %d' % ss.curstack))
   def watch_input(self, cmd, arg = ''):
     ss = self.getCurrentSession()
     if ss:
@@ -1197,9 +1205,9 @@ class DBGPavim:
     try:
       ss = self.getCurrentSession()
       if ss:
-        ss.command('run')
+        ss.s_command('run')
         if ss.status == 'stopping':
-          ss.command("stop")
+          ss.s_command("stop")
         elif ss.status != 'stopped':
           self.step()
       else:
@@ -1261,7 +1269,7 @@ class DBGPavim:
     if ss:
       id = ss.getbid(bno)
       if ss != None and id != None:
-        ss.command('breakpoint_remove', '-d ' + str(id))
+        ss.s_command('breakpoint_remove', '-d ' + str(id))
 
   def setBreakPoint(self, bno):
     ss = self.getCurrentSession()
