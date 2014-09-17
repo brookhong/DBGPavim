@@ -77,7 +77,7 @@ class VimWindow(object):
   def prepare(self):
     """ check window is OK, if not then create """
     if not self.isprepared():
-      self.create(self.method)
+      self.w_create(self.method)
   def before_create(self):
     vim.command("1wincmd w")
   def on_create(self):
@@ -106,7 +106,7 @@ class VimWindow(object):
         self.buffer.append(str(msg).split('\n'), lineno)
         self.w_command("normal %dG" % (lineno+1))
     #self.window.cursor = (len(self.buffer), 1)
-  def create(self, method = 'new'):
+  def w_create(self, method = 'new'):
     """ create window """
     self.method = method
     self.before_create()
@@ -117,7 +117,7 @@ class VimWindow(object):
     self.width  = int( vim.eval("winwidth(0)")  )
     self.height = int( vim.eval("winheight(0)") )
     self.on_create()
-  def destroy(self):
+  def w_destroy(self):
     """ destroy window """
     if self.buffer == None or len(dir(self.buffer)) == 0:
       return
@@ -350,7 +350,7 @@ class DebugUI:
     self.cliwin         = None
     self.backup_ssop    = vim.eval('&ssop')
 
-  def create(self, session):
+  def u_create(self, session):
     """ change mode to debug """
     self.session = session
     self.watchwin       = WatchWindow(session.address+"-WATCH_WINDOW")
@@ -366,10 +366,10 @@ class DebugUI:
     self.totalH = int(vim.eval('winheight(0)'))
     self.stackwinHeight = int(self.totalH*self.stackwinRatio)
     self.watchwinWidth = int(self.totalW*self.watchwinRatio)
-    self.stackwin.create('botright '+str(self.stackwinHeight)+' new')
+    self.stackwin.w_create('botright '+str(self.stackwinHeight)+' new')
     if self.cliwin:
-      self.cliwin.create('vertical new')
-    self.watchwin.create('vertical belowright '+str(self.watchwinWidth)+' new')
+      self.cliwin.w_create('vertical new')
+    self.watchwin.w_create('vertical belowright '+str(self.watchwinWidth)+' new')
     vim.command('1wincmd w') # goto srcview window(nr=1, top-left)
     self.cursign = '1'
     self.set_highlight()
@@ -391,12 +391,12 @@ class DebugUI:
       vim.command('help')
     else:
       if vim.eval('exists("t:dbgpavimHelp")') == '1':
-        self.helpwin.destroy()
+        self.helpwin.w_destroy()
         vim.command('unlet t:dbgpavimHelp')
       else:
         self.helpwin  = HelpWindow('HELP__WINDOW')
         self.stackwin.focus()
-        self.helpwin.create('vertical new')
+        self.helpwin.w_create('vertical new')
         vim.command('let t:dbgpavimHelp=1')
 
   def update_cli(self):
@@ -404,16 +404,20 @@ class DebugUI:
     vim.command('e')
     vim.command('normal G')
 
-  def destroy(self):
+  def u_destroy(self):
     """ destroy windows """
-    self.watchwin.destroy()
-    self.stackwin.destroy()
+    self.watchwin.w_destroy()
+    self.stackwin.w_destroy()
     if self.cliwin:
-      self.cliwin.destroy()
-    vim.command('q')
+      self.cliwin.w_destroy()
     vim.command('sign unplace 1')
     vim.command('sign unplace 2')
     self.set_highlight()
+    if vim.eval('tabpagenr("$")') == '1':
+      vim.command('unlet t:dbgpavimDebugging')
+      dbgPavim.updateStatusLine()
+    else:
+      vim.command('tabclose!')
   def go_srcview(self):
     vim.command('1wincmd w')
   def next_sign(self):
@@ -424,13 +428,9 @@ class DebugUI:
   def set_srcview(self, file, line):
     """ set srcview windows to file:line and replace current sign """
 
-    if file == self.file and self.line == line:
-      return
-
-    if file != self.file:
-      self.file = file
-      self.go_srcview()
-      vim.command('silent edit ' + file)
+    self.file = file
+    self.go_srcview()
+    vim.command('silent edit ' + file)
 
     vim.command('call dbgpavim#bindKeys()')
     if line == 0:
@@ -531,7 +531,7 @@ class DbgSession(object):
         if resDom.get('command') == "breakpoint_set":
           self.handle_response_breakpoint_set(resDom)
         if resDom.get('command') == "stop":
-          self.close()
+          self.s_close()
       elif resDom.tag == "{urn:debugger_protocol_v1}init":
         [fn, self.isWinServer] = getFilePath(resDom.get('fileuri'))
         self.language = resDom.get('language').lower()
@@ -587,7 +587,7 @@ class DbgSession(object):
       t = self.last_command.split(',')
       extra = t[-1][:-1]
     return extra
-  def close(self):
+  def s_close(self):
     if self.sock:
       self.sock.close()
       self.sock = None
@@ -614,9 +614,9 @@ class DbgSessionWithUI(DbgSession):
     self.laststack  = 0
     DbgSession.__init__(self,sock,address)
 
-  def close(self):
-    super(DbgSessionWithUI, self).close()
-    self.ui.destroy()
+  def s_close(self):
+    super(DbgSessionWithUI, self).s_close()
+    self.ui.u_destroy()
 
   def copyFromParent(self, ss):
     self.latestRes = ss.latestRes
@@ -632,11 +632,16 @@ class DbgSessionWithUI(DbgSession):
     self.s_command('feature_set', '-n max_data -v ' + dbgPavim.maxData)
     self.s_command('feature_set', '-n max_depth -v ' + dbgPavim.maxDepth)
     self.s_command(first_command)
+
+  def restart(self):
+    if vim.eval('exists("t:dbgpavimDebugging")') == '1':
+      vim.command('tabclose')
+    self.s_start(self.ui.cliwin)
   def s_start(self, cliwin = None):
     self.sock.settimeout(30)
 
     self.ui.cliwin = cliwin
-    self.ui.create(self)
+    self.ui.u_create(self)
     if self.bap:
       self.handle_recvd_msg(self.latestRes)
       self.init("stack_get")
@@ -1123,7 +1128,7 @@ class DBGPavim:
         print "socket timeout, try again or press F6 to stop debugging."
     else: #errno == socket.error:
       del self.debugSessions[currentSession.address]
-      currentSession.close()
+      currentSession.s_close()
       if session != None:
         self.debugSessions[session.address] = session
         session.s_start()
@@ -1318,12 +1323,19 @@ class DBGPavim:
         vim.command('sign place ' + str(bno) + ' name=breakpt line=' + str(row) + ' file=' + file)
         self.setBreakPoint(bno)
 
+  def closeCurrentSession(self):
+    ss = self.getCurrentSession()
+    if ss:
+      del self.debugSessions[ss.address]
+      ss.send_command('detach')
+      ss.s_close()
+
   def quit(self):
     ss = self.getCurrentSession()
     if ss:
       del self.debugSessions[ss.address]
       ss.send_command('detach')
-      ss.close()
+      ss.s_close()
     else:
       self.running = False
       self.debugListener.stop()

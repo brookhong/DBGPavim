@@ -235,6 +235,7 @@ function! dbgpavim#bindKeys()
   endfor
   exec 'vnoremap <buffer> '.g:dbgPavimKeyPropertyGet.' "vy:python dbgPavim.session_command("property_get","%v%")<CR>'
   exec 'vnoremap <buffer> '.g:dbgPavimKeyEval.' "vy:python dbgPavim.watch_input("eval", "%v%")<CR>$a<CR>'
+  autocmd BufWinLeave <buffer> python dbgPavim.closeCurrentSession()
 endfunction
 
 function! dbgpavim#WatchWindowOnEnter()
