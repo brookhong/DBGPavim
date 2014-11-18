@@ -162,6 +162,7 @@ class StackWindow(VimWindow):
     super(StackWindow, self).on_create()
     vim.command('nnoremap <silent> <buffer> <Enter> :call dbgpavim#StackWindowOnEnter()<CR>')
     vim.command('call dbgpavim#bindKeys()')
+    vim.command('autocmd BufWinLeave <buffer> python dbgPavim.closeCurrentSession()')
     vim.command('highlight CurStack term=reverse ctermfg=White ctermbg=Red gui=reverse')
     self.highlight_stack(0)
   def highlight_stack(self, no):
@@ -259,6 +260,7 @@ class WatchWindow(VimWindow):
     vim.command('inoremap <buffer> <cr> <esc>:python dbgPavim.session_command("watch_execute")<cr>')
     vim.command('nnoremap <silent> <buffer> <Enter> :call dbgpavim#WatchWindowOnEnter()<CR>')
     vim.command('call dbgpavim#bindKeys()')
+    vim.command('autocmd BufWinLeave <buffer> python dbgPavim.closeCurrentSession()')
   def input(self, mode, arg = ''):
     if arg == '%v%':
       arg = vim.eval('@v')
