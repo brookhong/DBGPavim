@@ -160,8 +160,8 @@ class StackWindow(VimWindow):
     self.write(lines)
   def on_create(self):
     super(StackWindow, self).on_create()
-    vim.command('nnoremap <silent> <buffer> <Enter> :call dbgpavim#StackWindowOnEnter()<CR>')
-    vim.command('call dbgpavim#bindKeys()')
+    vim.command('nnoremap <silent> <buffer> <Enter> :call DbgpavimStackWindowOnEnter()<CR>')
+    vim.command('call DbgpavimBindKeys()')
     vim.command('autocmd BufWinLeave <buffer> python dbgPavim.closeCurrentSession()')
     vim.command('highlight CurStack term=reverse ctermfg=White ctermbg=Red gui=reverse')
     self.highlight_stack(0)
@@ -258,8 +258,8 @@ class WatchWindow(VimWindow):
     self.w_command('setl noai nocin')
     vim.command('setl wrap fdm=manual fmr={{{,}}} ft=%s fdl=1' % self.language)
     vim.command('inoremap <buffer> <cr> <esc>:python dbgPavim.session_command("watch_execute")<cr>')
-    vim.command('nnoremap <silent> <buffer> <Enter> :call dbgpavim#WatchWindowOnEnter()<CR>')
-    vim.command('call dbgpavim#bindKeys()')
+    vim.command('nnoremap <silent> <buffer> <Enter> :call DbgpavimWatchWindowOnEnter()<CR>')
+    vim.command('call DbgpavimBindKeys()')
     vim.command('autocmd BufWinLeave <buffer> python dbgPavim.closeCurrentSession()')
   def input(self, mode, arg = ''):
     if arg == '%v%':
@@ -325,7 +325,7 @@ class HelpWindow(VimWindow):
         '  For more instructions and latest version,                         \n' + \
         '               pleae refer to https://github.com/brookhong/DBGPavim \n' + \
         '')
-    vim.command('call dbgpavim#bindKeys()')
+    vim.command('call DbgpavimBindKeys()')
     vim.command('1')
 
 class ConsoleWindow(VimWindow):
@@ -434,7 +434,7 @@ class DebugUI:
     self.go_srcview()
     vim.command('silent edit ' + file)
 
-    vim.command('call dbgpavim#bindKeys()')
+    vim.command('call DbgpavimBindKeys()')
     if line == 0:
       line = 1
     nextsign = self.next_sign()
@@ -1001,7 +1001,7 @@ class BreakPoint:
     del self.dictionaries[bno]
   def find(self, file, line):
     """ find break point and return bno(breakpoint number) """
-    signs = vim.eval('dbgpavim#Signs()')
+    signs = vim.eval('DbgpavimSigns()')
     for k in signs.keys():
       if signs[k][0] == file and signs[k][1] == line:
         bno = int(k)
@@ -1240,10 +1240,10 @@ class DBGPavim:
     if filename:
       cmd = ' '+filename+' '+args
       if filetype == 'php':
-        if vim.eval('dbgpavim#CheckXdebug()') == '0':
+        if vim.eval('DbgpavimCheckXdebug()') == '0':
           cmd = 'php -dxdebug.remote_autostart=1 -dxdebug.remote_port='+str(self.port)+cmd
       elif filetype == 'python':
-        if vim.eval('dbgpavim#CheckPydbgp()') == '0':
+        if vim.eval('DbgpavimCheckPydbgp()') == '0':
           cmd = 'pydbgp -u -d '+str(self.port)+cmd
       else:
         print "Only python and php file debugging are integrated for now."

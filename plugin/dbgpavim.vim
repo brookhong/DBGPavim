@@ -219,7 +219,7 @@ function! s:Bae()
   execute 'python dbgPavim.breakAtEntry = '.g:dbgPavimBreakAtEntry
 endfunction
 
-function! dbgpavim#bindKeys()
+function! DbgpavimBindKeys()
   let s:keyMappings = {
         \ g:dbgPavimKeyHelp : ':python dbgPavim.session_command("help")<cr>',
         \ g:dbgPavimKeyStepInto : ':python dbgPavim.d_command("step_into")<cr>',
@@ -237,7 +237,7 @@ function! dbgpavim#bindKeys()
   exec 'vnoremap <buffer> '.g:dbgPavimKeyEval.' "vy:python dbgPavim.watch_input("eval", "%v%")<CR>$a<CR>'
 endfunction
 
-function! dbgpavim#WatchWindowOnEnter()
+function! DbgpavimWatchWindowOnEnter()
   let l:line = getline(".")
   if l:line =~ "^\\s*.* = (.*)+;$"
     let l:var = substitute(line,"\\s*\\(\\S.*\\S\\)\\s*=.*","\\1","g")
@@ -252,7 +252,7 @@ function! dbgpavim#WatchWindowOnEnter()
     execute 'normal za'
   endif
 endfunction
-function! dbgpavim#StackWindowOnEnter()
+function! DbgpavimStackWindowOnEnter()
   let l:stackNo = substitute(getline("."),"\\(\\d\\+\\)\\s\\+.*","\\1","g")
   if l:stackNo =~ "^\\d\\+$"
     execute 'python dbgPavim.session_command("go", '.l:stackNo.')'
@@ -260,7 +260,7 @@ function! dbgpavim#StackWindowOnEnter()
   endif
 endfunction
 
-function! dbgpavim#CheckPydbgp()
+function! DbgpavimCheckPydbgp()
   let l:ret = 0
   let l:pydbgp = executable('pydbgp')
   if l:pydbgp == 0
@@ -269,7 +269,7 @@ function! dbgpavim#CheckPydbgp()
   endif
   return l:ret
 endfunction
-function! dbgpavim#CheckXdebug()
+function! DbgpavimCheckXdebug()
   let l:ret = 0
   let l:phpinfo = system('php -r "phpinfo();"')
   let l:port = matchstr(l:phpinfo, 'xdebug.remote_port => \d\+')
@@ -285,7 +285,7 @@ function! dbgpavim#CheckXdebug()
   endif
   return l:ret
 endfunction
-function! dbgpavim#Signs()
+function! DbgpavimSigns()
   let l:signs = ''
   redir => l:signs
   silent exec 'sign place buffer='.bufnr('%')
